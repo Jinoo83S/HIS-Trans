@@ -192,10 +192,11 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12p
 .admin-section h4 { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 14px;
   padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 
-/* ── diff 박스 ── */
-.diff-box { font-size:11px; line-height:1.6; padding:6px 9px; border-top:1px dashed #fbbf24;
-  background:#fffbeb; color:var(--text2); max-height:60px; overflow-y:auto;
-  white-space:pre-wrap; word-break:break-all; }
+/* ── diff 박스 (번역 초본에 하이라이트 오버레이) ── */
+.diff-box { font-size:12px; line-height:1.6; padding:7px 6px;
+  background:#f8fafc; color:var(--text); overflow-y:auto;
+  white-space:pre-wrap; word-break:break-all; cursor:default; }
+.diff-box mark { background:#fef08a; border-radius:2px; padding:0 1px; }
 
 /* 스크롤바 */
 ::-webkit-scrollbar { width: 5px; height: 5px; }

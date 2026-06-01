@@ -185,11 +185,14 @@ function renderTable() {
     '<th>이름</th>' +
     '<th>Gr.</th><th>Cls.</th><th>NEIS</th>' +
     '<th class="ths">Source (원문)</th>' +
-    '<th>→</th>' +
+    '<th>번역</th>' +
     '<th class="tht">번역 초본</th>' +
     (!isTrans ? '<th class="thf">최종본</th>' : '') +
     (!isTrans ? '<th>검토</th>' : '') +
-    (!isTrans ? '<th>검수 코멘트</th>' : '') +
+    (!isTrans ? '<th>검수 코멘트 <button type="button" onclick="showNeisHelp()" ' +
+      'style="background:var(--teal);color:#fff;border:none;border-radius:50%;' +
+      'width:16px;height:16px;font-size:10px;cursor:pointer;font-weight:700;' +
+      'line-height:16px;padding:0;vertical-align:middle">?</button></th>' : '') +
     '<th>글자수</th><th>상태</th>' +
     '</tr>';
 
@@ -223,12 +226,17 @@ function rowHtml(r, i, role) {
         ${r.translating ? '⏳' : '▶'}
       </button>
     </td>
-    <td><textarea class="cta drft" readonly
-      style="background:#f8fafc;color:var(--text2)">${e(r.translatedDraft)}</textarea></td>
+    <td>
+      <textarea class="cta drft" readonly id="drft_${i}"
+        style="background:#f8fafc;color:var(--text2);${diffHtml?'display:none':''}">${e(r.translatedDraft)}</textarea>
+      <div class="diff-box" id="diff_${i}"
+        style="${diffHtml?'':'display:none'};min-height:76px;padding:7px 6px;
+        font-size:12px;line-height:1.6;word-break:break-all;background:#f8fafc;
+        overflow-y:auto;border:none">${diffHtml}</div>
+    </td>
     ${!isTrans ? `
     <td>
       <textarea class="cta fnl" id="fnl_${i}" oninput="onFinalChange(${i},this.value)">${e(r.finalText)}</textarea>
-      ${diffHtml ? `<div class="diff-box" id="diff_${i}">${diffHtml}</div>` : `<div class="diff-box" id="diff_${i}" style="display:none"></div>`}
     </td>
     <td class="ca">
       <button class="btn-arrow" onclick="runNeisCheck(${i})" title="NEIS 검토"
@@ -241,10 +249,18 @@ function rowHtml(r, i, role) {
       style="min-height:76px;padding:7px 9px;font-size:11px;
       color:var(--text2);background:#fafafa;overflow-y:auto;white-space:pre-wrap">${e(r.comment)}</div></td>
     ` : ''}
-    <td><div class="cc ${ccCls}">${cc>0?cc+'/500':'-'}</div></td>
+    <td><div class="cc ${ccCls}">
+      ${cc>0 ? '<span style="font-size:9px;color:var(--gray);display:block">' +
+        (document.getElementById('selSem')?.value==='1'?'1학기':'2학기') +
+        '</span>' + cc + '/500' : '-'}
+    </div></td>
     <td><div class="ci">
-      <span class="sbadge s-${r.status}">${r.status}</span><br>
-      <button class="btn-cp" onclick="saveRow(${i})" style="margin-top:4px">저장</button>
+      <span class="sbadge s-${r.status}">${r.status}</span>
+      ${!r.rowIndex ? '<div style="margin-top:4px;font-size:9px;color:var(--red);font-weight:700">● 미저장</div>' : ''}
+      <button class="btn-cp" onclick="saveRow(${i})"
+        style="margin-top:4px;width:100%;${!r.rowIndex?'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700':''}">
+        저장
+      </button>
     </div></td>
   </tr>`;
 }
@@ -272,15 +288,18 @@ function onDraftChange(i, val) {
 function onFinalChange(i, val) {
   APP.rows[i].finalText = val;
   updateCC(i);
-  // diff 하이라이트 업데이트
-  var diffEl = document.getElementById('diff_' + i);
+  // diff 하이라이트 - 번역 초본 td에 표시
+  var diffEl  = document.getElementById('diff_' + i);
+  var drftEl  = document.getElementById('drft_' + i);
   if (diffEl && APP.rows[i].translatedDraft) {
     var html = buildDiffHtml(APP.rows[i].translatedDraft, val);
     if (html) {
       diffEl.innerHTML = html;
       diffEl.style.display = '';
+      if (drftEl) drftEl.style.display = 'none';
     } else {
       diffEl.style.display = 'none';
+      if (drftEl) drftEl.style.display = '';
     }
   }
 }
@@ -290,7 +309,11 @@ function updateCC(i) {
   var el = document.querySelector('#row_' + i + ' .cc');
   if (!el) return;
   var cls = cc === 0 ? '' : cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
-  el.textContent = cc > 0 ? cc + '/500' : '-';
+  var sem = document.getElementById('selSem').value;
+  var semLabel = sem === '1' ? '1학기' : '2학기';
+  el.innerHTML = cc > 0
+    ? '<span style="font-size:9px;color:var(--gray);display:block">' + semLabel + '</span>' + cc + '/500'
+    : '-';
   el.className = 'cc ' + cls;
 }
 
@@ -442,11 +465,11 @@ async function runNeisCheck(i) {
     var res = await API.neisValidate(txt);
     if (!res.success) return;
     var d = res.data;
-    var msg = '글자수: ' + d.charCount + '/500\n';
+    var msg = '';
     if (d.warnings && d.warnings.length) {
-      msg += '\n⚠️ ' + d.warnings.join('\n⚠️ ');
+      msg = '⚠️ ' + d.warnings.join('\n⚠️ ');
     } else {
-      msg += '\n✓ 이상 없음';
+      msg = '✓ 이상 없음';
     }
     APP.rows[i].comment = msg;
     if (cmtEl) cmtEl.textContent = msg;
@@ -740,6 +763,41 @@ function resetUrl() {
 }
 
 // ── 유틸 ────────────────────────────────────────────────────
+function showNeisHelp() {
+  var overlay = document.getElementById('neisHelpOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'neisHelpOverlay';
+    overlay.className = 'overlay open';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:460px">
+        <button class="modal-x" onclick="document.getElementById('neisHelpOverlay').classList.remove('open')">×</button>
+        <h3>🔍 NEIS 검토 항목</h3>
+        <div style="margin-top:12px;font-size:12px;line-height:2;color:var(--text)">
+          <div style="padding:8px 12px;background:var(--bg3);border-radius:6px;margin-bottom:8px">
+            <b>📏 글자수</b> — 500자 초과 여부 확인
+          </div>
+          <div style="padding:8px 12px;background:var(--bg3);border-radius:6px;margin-bottom:8px">
+            <b>🚫 금칙 특수문자</b> — NEIS 입력 불가 문자<br>
+            <span style="font-family:monospace;color:var(--red)">&lt; &gt; { } [ ] \ | ^ ~ \`</span>
+          </div>
+          <div style="padding:8px 12px;background:var(--bg3);border-radius:6px;margin-bottom:8px">
+            <b>✍️ 문장 종결</b> — ~함. ~임. ~됨. ~있음. 등 권장
+          </div>
+          <div style="padding:8px 12px;background:var(--bg3);border-radius:6px">
+            <b>🔁 중복 표현</b> — 동일 단어 3회 이상 반복 감지
+          </div>
+        </div>
+        <div class="mfooter">
+          <button class="btn-save" onclick="document.getElementById('neisHelpOverlay').classList.remove('open')">확인</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+  } else {
+    overlay.classList.add('open');
+  }
+}
+
 function showApiKeyAlert(msg) {
   var overlay = document.getElementById('apiKeyAlertOverlay');
   var msgEl   = document.getElementById('apiKeyAlertMsg');
