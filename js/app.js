@@ -280,7 +280,7 @@ function rowHtml(r, i, role) {
     <td><div class="ci">${s.grade}</div></td>
     <td><div class="ci">${s.class}</div></td>
     <td><div class="ci ci-neis">${e(s.neis||s.neisClass||'')}</div></td>
-    <td><textarea class="cta src" oninput="APP.rows[${i}].sourceText=this.value"
+    <td><textarea class="cta src" oninput="APP.rows[${i}].sourceText=this.value;markDirty(${i})"
       ${role==='검수'?'readonly':''}>${e(r.sourceText)}</textarea></td>
     <td class="ca">
       <button class="btn-arrow" onclick="translateRow(${i})" title="번역"
@@ -319,11 +319,11 @@ function rowHtml(r, i, role) {
         (document.getElementById('selSem')?.value==='1'?'1학기':'2학기') +
         '</span>' + cc + '/500' : '-'}
     </div></td>
-    <td><div class="ci">
-      <span class="sbadge s-${r.status}">${r.status}</span>
-      ${!r.rowIndex ? '<div style="margin-top:4px;font-size:9px;color:var(--red);font-weight:700">● 미저장</div>' : ''}
+    <td><div class="ci" style="padding:4px 2px">
+      ${buildStatusBadge(r)}
       <button class="btn-cp" onclick="saveRow(${i})"
-        style="margin-top:4px;width:100%;${!r.rowIndex?'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700':''}">
+        style="margin-top:5px;width:100%;
+        ${r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : ''}">
         저장
       </button>
     </div></td>
@@ -346,12 +346,23 @@ function showEmptyTrans() {
 }
 
 // ── 이벤트 ──────────────────────────────────────────────────
+function markDirty(i) {
+  if (APP.rows[i]) { APP.rows[i]._dirty = true; }
+  // 상태 셀만 빠르게 갱신
+  var td = document.querySelector('#row_' + i + ' td:last-child .ci');
+  if (td) td.innerHTML = buildStatusBadge(APP.rows[i]) +
+    '<button class="btn-cp" onclick="saveRow(' + i + ')" ' +
+    'style="margin-top:5px;width:100%;background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700">저장</button>';
+}
+
 function onDraftChange(i, val) {
   APP.rows[i].translatedDraft = val;
+  markDirty(i);
   updateCC(i);
 }
 function onFinalChange(i, val) {
   APP.rows[i].finalText = val;
+  markDirty(i);
   updateCC(i);
   // diff 하이라이트 - 번역 초본 td에 표시
   var diffEl  = document.getElementById('diff_' + i);
@@ -447,6 +458,7 @@ async function translateRow(i) {
     } else {
       row.translatedDraft = res.text;
       if (!row.finalText) row.finalText = res.text;
+      row._dirty = true;
       toast('번역 완료 ✓', 'success');
     }
   } catch(e) {
@@ -513,6 +525,7 @@ async function saveRow(i) {
     }
     if (res && res.success) {
       row.status = row.finalText ? 'reviewed' : 'draft';
+      row._dirty = false;
       refreshRow(i);
       toast('저장 완료 ✓', 'success');
     } else {
@@ -881,6 +894,26 @@ function resetUrl() {
 }
 
 // ── 유틸 ────────────────────────────────────────────────────
+function buildStatusBadge(r) {
+  // 저장 안 됨
+  if (!r.rowIndex) {
+    return '<div style="font-size:10px;font-weight:700;color:var(--red)">● 미저장</div>';
+  }
+  // 저장됨 + 미수정
+  if (!r._dirty) {
+    var label = r.status === 'reviewed' ? '검수완료'
+              : r.status === 'final'    ? '최종완료'
+              : '저장됨';
+    var cls   = r.status === 'reviewed' ? 's-reviewed'
+              : r.status === 'final'    ? 's-final'
+              : 's-draft';
+    return '<span class="sbadge ' + cls + '">' + label + '</span>';
+  }
+  // 저장됨 + 수정됨
+  return '<span class="sbadge s-draft">수정중</span>' +
+    '<div style="font-size:9px;color:var(--gold);font-weight:700;margin-top:2px">● 미저장</div>';
+}
+
 function showNeisHelp() {
   var overlay = document.getElementById('neisHelpOverlay');
   if (!overlay) {
