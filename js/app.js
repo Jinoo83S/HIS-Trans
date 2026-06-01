@@ -111,21 +111,54 @@ async function onSubjectChange() {
   if (!opt || !opt.dataset.s) { APP.selectedSubject = null; showEmptyTrans(); return; }
 
   APP.selectedSubject = JSON.parse(opt.dataset.s);
-  showLoading('학생 목록 불러오는 중...');
+  showLoading('불러오는 중...');
 
   try {
     var isClub = APP.currentTab === '동아리';
-    var res = await API.getStudentsByCourse(APP.selectedSubject.subjectCode, isClub);
-    hideLoading();
-    if (!res.success) { toast('학생 로드 실패', 'error'); return; }
+    var subjectCode = APP.selectedSubject.subjectCode;
+    var filters = {
+      year:        document.getElementById('selYear').value,
+      semester:    document.getElementById('selSem').value,
+      subjectCode: subjectCode
+    };
 
-    APP.rows = res.data.map(s => ({
-      student: s, sourceText: '', translatedDraft: '',
-      finalText: '', comment: '', status: 'draft',
-      rowIndex: null, translating: false
-    }));
+    // 학생 목록 + 저장된 번역 데이터 병렬 로드
+    var [studentsRes, transRes] = await Promise.all([
+      API.getStudentsByCourse(subjectCode, isClub),
+      API.getTransList(filters)
+    ]);
+
+    hideLoading();
+    if (!studentsRes.success) { toast('학생 로드 실패', 'error'); return; }
+
+    // 저장된 번역 데이터를 학생 이름 기준으로 맵핑
+    // 같은 학생의 여러 레코드 중 가장 최신(rowIndex 큰) 것 사용
+    var transMap = {};
+    if (transRes && transRes.data) {
+      transRes.data.forEach(function(t) {
+        var key = t.studentName;
+        if (!transMap[key] || t.rowIndex > transMap[key].rowIndex) {
+          transMap[key] = t;
+        }
+      });
+    }
+
+    APP.rows = studentsRes.data.map(function(s) {
+      var saved = transMap[s.name] || {};
+      return {
+        student:        s,
+        sourceText:     saved.sourceText     || '',
+        translatedDraft:saved.translatedDraft|| '',
+        finalText:      saved.finalText      || saved.reviewedText || '',
+        comment:        saved.reviewerComment|| '',
+        status:         saved.status         || 'draft',
+        rowIndex:       saved.rowIndex       || null,
+        translating:    false
+      };
+    });
+
     renderTable();
-  } catch(e) { hideLoading(); toast(e.message, 'error'); }
+  } catch(err) { hideLoading(); toast(err.message, 'error'); }
 }
 
 function onFilterChange() { loadSubjects(); }
