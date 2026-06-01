@@ -143,13 +143,12 @@ body::before { content: ''; position: fixed; inset: 0;
 <script>
   // 이미 로그인 상태면 앱으로
   window.onload = function() {
-    // URL 미설정 시 모달 열기
     if (!Config.isSet()) {
       openUrlModal();
       return;
     }
-    // 교사 이름 목록 로드 (오류 무시)
-    loadTeacherNames();
+    // 로그인 후 이름 자동완성 로드 (비동기, 실패해도 무관)
+    setTimeout(loadTeacherNames, 2000);
   };
 
   document.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doLogin(); } });
@@ -196,9 +195,21 @@ body::before { content: ''; position: fixed; inset: 0;
   async function loadTeacherNames() {
     if (!Config.isSet()) return;
     try {
-      var res = await API.call('getTeacherNames', {});
-      if (res && res.success) _allNames = res.data;
-    } catch(e) {}
+      var controller = new AbortController();
+      var timeout = setTimeout(() => controller.abort(), 5000);
+      var url = Config.get();
+      var res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'getTeacherNames' }),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      var data = await res.json();
+      if (data && data.success) _allNames = data.data;
+    } catch(e) {
+      // 실패해도 무시 - 자동완성 없이 직접 입력
+    }
   }
 
   function onNameInput(val) {
