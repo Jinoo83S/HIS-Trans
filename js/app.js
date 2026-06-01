@@ -145,16 +145,52 @@ function renderTable() {
 
   var isTrans = role === '번역';
 
+  var colsInfo = !isTrans
+    ? '<colgroup>' +
+      '<col style="width:6%">' +   // Name EN
+      '<col style="width:5%">' +   // 이름
+      '<col style="width:3%">' +   // Gr.
+      '<col style="width:3%">' +   // Cls.
+      '<col style="width:5%">' +   // NEIS
+      '<col style="width:18%">' +  // Source
+      '<col style="width:3%">' +   // →
+      '<col style="width:18%">' +  // 번역 초본
+      '<col style="width:18%">' +  // 최종본
+      '<col style="width:3%">' +   // 검토
+      '<col style="width:10%">' +  // 검수 코멘트
+      '<col style="width:4%">' +   // 글자수
+      '<col style="width:4%">' +   // 상태
+      '</colgroup>'
+    : '<colgroup>' +
+      '<col style="width:8%">' +   // Name EN
+      '<col style="width:7%">' +   // 이름
+      '<col style="width:4%">' +   // Gr.
+      '<col style="width:4%">' +   // Cls.
+      '<col style="width:7%">' +   // NEIS
+      '<col style="width:28%">' +  // Source
+      '<col style="width:4%">' +   // →
+      '<col style="width:32%">' +  // 번역 초본
+      '<col style="width:6%">' +   // 글자수
+      '<col style="width:6%">' +   // 상태
+      '</colgroup>';
+
+  // colgroup을 테이블에 삽입
+  var tableEl = document.getElementById('mainTable');
+  var existingCols = tableEl.querySelector('colgroup');
+  if (existingCols) existingCols.remove();
+  tableEl.insertAdjacentHTML('afterbegin', colsInfo);
+
   head.innerHTML = '<tr>' +
-    '<th style="min-width:90px">Name (EN)</th>' +
-    '<th style="min-width:70px">이름</th>' +
+    '<th>Name (EN)</th>' +
+    '<th>이름</th>' +
     '<th>Gr.</th><th>Cls.</th><th>NEIS</th>' +
-    '<th class="ths" style="min-width:260px">Source (원문)</th>' +
-    '<th style="min-width:70px">번역</th>' +
-    '<th class="tht" style="min-width:240px">번역 초본</th>' +
-    (!isTrans ? '<th class="thf" style="min-width:240px">최종본</th>' : '') +
-    (!isTrans ? '<th style="min-width:130px">검수 코멘트</th>' : '') +
-    '<th>글자수</th><th style="min-width:80px">상태</th>' +
+    '<th class="ths">Source (원문)</th>' +
+    '<th>→</th>' +
+    '<th class="tht">번역 초본</th>' +
+    (!isTrans ? '<th class="thf">최종본</th>' : '') +
+    (!isTrans ? '<th>검토</th>' : '') +
+    (!isTrans ? '<th>검수 코멘트</th>' : '') +
+    '<th>글자수</th><th>상태</th>' +
     '</tr>';
 
   body.innerHTML = APP.rows.map((r, i) => rowHtml(r, i, role)).join('');
@@ -166,30 +202,44 @@ function rowHtml(r, i, role) {
   var cc = txt.length;
   var ccCls = cc === 0 ? '' : cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
   var isTrans = role === '번역';
+  // 번역초본 vs 최종본 diff 하이라이트 HTML
+  var diffHtml = r.finalText && r.translatedDraft
+    ? buildDiffHtml(r.translatedDraft, r.finalText) : '';
 
   return `<tr id="row_${i}">
-    <td><div class="ci">${e(s.engName||'-')}</div></td>
-    <td><div class="ci">${e(s.name)}</div></td>
+    <td><div class="ci" style="font-size:11px">${e(s.engName||'-')}</div></td>
+    <td><div class="ci" style="font-size:11px">${e(s.name)}</div></td>
     <td><div class="ci">${s.grade}</div></td>
     <td><div class="ci">${s.class}</div></td>
-    <td><div class="ci ci-neis">${e(s.neisClass||'')}</div></td>
+    <td><div class="ci ci-neis">${e(s.neis||s.neisClass||'')}</div></td>
     <td><textarea class="cta src" oninput="APP.rows[${i}].sourceText=this.value"
       ${role==='검수'?'readonly':''}>${e(r.sourceText)}</textarea></td>
     <td class="ca">
-      <button class="btn-tr" onclick="translateRow(${i})" ${r.translating?'disabled':''}>
-        ${r.translating?'..':'번역'}</button>
-      <button class="btn-cp" onclick="copyText(${i},'draft')">복사</button>
+      <button class="btn-arrow" onclick="translateRow(${i})" title="번역"
+        ${r.translating?'disabled':''} style="font-size:16px;background:none;border:none;
+        cursor:pointer;color:var(--teal);padding:4px;transition:transform 0.15s"
+        onmouseover="this.style.transform='scale(1.3)'"
+        onmouseout="this.style.transform='scale(1)'">
+        ${r.translating ? '⏳' : '▶'}
+      </button>
     </td>
-    <td><textarea class="cta drft" oninput="onDraftChange(${i},this.value)"
-      ${isTrans?'readonly':''}>${e(r.translatedDraft)}</textarea></td>
+    <td><textarea class="cta drft" readonly
+      style="background:#f8fafc;color:var(--text2)">${e(r.translatedDraft)}</textarea></td>
     ${!isTrans ? `
-    <td><textarea class="cta fnl" oninput="onFinalChange(${i},this.value)">${e(r.finalText)}</textarea>
-      <div class="ca">
-        <button class="btn-cp" onclick="copyText(${i},'final')">NEIS 복사</button>
-        <button class="btn-cp" onclick="checkNeis(${i})" style="margin-top:2px">NEIS 검토</button>
-      </div>
+    <td>
+      <textarea class="cta fnl" id="fnl_${i}" oninput="onFinalChange(${i},this.value)">${e(r.finalText)}</textarea>
+      ${diffHtml ? `<div class="diff-box" id="diff_${i}">${diffHtml}</div>` : `<div class="diff-box" id="diff_${i}" style="display:none"></div>`}
     </td>
-    <td><textarea class="cta cmt" oninput="APP.rows[${i}].comment=this.value">${e(r.comment)}</textarea></td>
+    <td class="ca">
+      <button class="btn-arrow" onclick="runNeisCheck(${i})" title="NEIS 검토"
+        style="font-size:14px;background:none;border:none;cursor:pointer;
+        color:var(--primary);padding:4px;transition:transform 0.15s"
+        onmouseover="this.style.transform='scale(1.3)'"
+        onmouseout="this.style.transform='scale(1)'">🔍</button>
+    </td>
+    <td><div class="cta cmt" id="neis_cmt_${i}"
+      style="min-height:76px;padding:7px 9px;font-size:11px;
+      color:var(--text2);background:#fafafa;overflow-y:auto;white-space:pre-wrap">${e(r.comment)}</div></td>
     ` : ''}
     <td><div class="cc ${ccCls}">${cc>0?cc+'/500':'-'}</div></td>
     <td><div class="ci">
@@ -222,6 +272,17 @@ function onDraftChange(i, val) {
 function onFinalChange(i, val) {
   APP.rows[i].finalText = val;
   updateCC(i);
+  // diff 하이라이트 업데이트
+  var diffEl = document.getElementById('diff_' + i);
+  if (diffEl && APP.rows[i].translatedDraft) {
+    var html = buildDiffHtml(APP.rows[i].translatedDraft, val);
+    if (html) {
+      diffEl.innerHTML = html;
+      diffEl.style.display = '';
+    } else {
+      diffEl.style.display = 'none';
+    }
+  }
 }
 function updateCC(i) {
   var txt = APP.rows[i].finalText || APP.rows[i].translatedDraft || '';
@@ -352,6 +413,48 @@ async function saveRow(i) {
 }
 
 // ── NEIS 검토 ────────────────────────────────────────────────
+// ── 단어 단위 diff ────────────────────────────────────────────
+function buildDiffHtml(original, modified) {
+  if (!original || !modified || original === modified) return '';
+  var a = original.split('');
+  var b = modified.split('');
+  // 간단한 문자 단위 diff: 변경된 부분 하이라이트
+  var result = '';
+  var maxLen = Math.max(a.length, b.length);
+  var changed = false;
+  for (var i = 0; i < b.length; i++) {
+    if (a[i] === b[i]) {
+      result += e(b[i]);
+    } else {
+      result += '<mark style="background:#fef08a;border-radius:2px">' + e(b[i]) + '</mark>';
+      changed = true;
+    }
+  }
+  return changed ? result : '';
+}
+
+async function runNeisCheck(i) {
+  var txt = APP.rows[i].finalText || APP.rows[i].translatedDraft;
+  if (!txt) { toast('검토할 텍스트가 없습니다.', 'error'); return; }
+  var cmtEl = document.getElementById('neis_cmt_' + i);
+  if (cmtEl) cmtEl.textContent = '검토 중...';
+  try {
+    var res = await API.neisValidate(txt);
+    if (!res.success) return;
+    var d = res.data;
+    var msg = '글자수: ' + d.charCount + '/500\n';
+    if (d.warnings && d.warnings.length) {
+      msg += '\n⚠️ ' + d.warnings.join('\n⚠️ ');
+    } else {
+      msg += '\n✓ 이상 없음';
+    }
+    APP.rows[i].comment = msg;
+    if (cmtEl) cmtEl.textContent = msg;
+  } catch(err) {
+    if (cmtEl) cmtEl.textContent = '검토 오류: ' + err.message;
+  }
+}
+
 async function checkNeis(i) {
   var txt = APP.rows[i].finalText || APP.rows[i].translatedDraft;
   if (!txt) { toast('검토할 텍스트가 없습니다.', 'error'); return; }
