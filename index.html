@@ -700,8 +700,17 @@ var APP = {
 // 초기화
 // ============================================================
 window.onload = function() {
+  // GAS 환경 아닌 경우 방어
+  if (typeof google === 'undefined' || !google.script) {
+    hideLoading();
+    document.getElementById('main').innerHTML =
+      '<div class="empty-state"><div class="icon">⚠️</div>' +
+      '<p>Google Apps Script 환경에서만 실행 가능합니다.<br>' +
+      'This app must be run as a Google Apps Script Web App.</p></div>';
+    return;
+  }
+
   var token = getUrlParam('token') || localStorage.getItem('his_token');
-  var teacherStr = localStorage.getItem('his_teacher');
 
   if (!token) { redirectLogin(); return; }
 

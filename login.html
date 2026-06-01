@@ -245,12 +245,14 @@
     google.script.run
       .withSuccessHandler(function(res) {
         if (res.success) {
-          // 토큰을 localStorage에 저장 후 메인 페이지로
           localStorage.setItem('his_token', res.token);
           localStorage.setItem('his_teacher', JSON.stringify(res.teacher));
+          // GAS Web App URL에 token 파라미터로 이동
           google.script.run
             .withSuccessHandler(function(url) {
-              window.location.href = url + '?token=' + res.token;
+              // 기존 URL에서 exec 부분까지만 사용
+              var baseUrl = url.split('?')[0];
+              window.location.href = baseUrl + '?token=' + res.token;
             })
             .getScriptUrl();
         } else {
