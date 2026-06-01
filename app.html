@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HIS 생기부 번역</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- 로딩 -->
+<div id="loading"><div class="spinner"></div><div class="loading-text">불러오는 중...</div></div>
+
+<!-- 헤더 -->
+<div id="header">
+  <div class="logo-wrap">
+    <div class="logo">HIS</div>
+    <div class="logo-sub">생기부 번역</div>
+  </div>
+  <div class="hsep"></div>
+  <nav class="hnav">
+    <button class="nav-btn active" data-view="translate" onclick="setView(this)">번역 / Translate</button>
+    <button class="nav-btn" data-view="review" onclick="setView(this)" id="navReview">검수 / Review</button>
+    <button class="nav-btn" data-view="admin" onclick="setView(this)" id="navAdmin" style="display:none">관리 / Admin</button>
+  </nav>
+  <div class="hright">
+    <div class="teacher-badge"><span id="tName">-</span></div>
+    <div class="role-badge" id="rBadge">-</div>
+    <button class="btn-sm" onclick="openUrlModal()">🔗 URL</button>
+    <button class="btn-sm danger" onclick="doLogout()">로그아웃</button>
+  </div>
+</div>
+
+<!-- 툴바 -->
+<div id="toolbar">
+  <div class="tb-row">
+    <div class="ctrl-g"><span class="clabel">Year</span>
+      <select id="selYear" onchange="onFilterChange()"></select></div>
+    <div class="ctrl-g"><span class="clabel">Sem.</span>
+      <select id="selSem" onchange="onFilterChange()">
+        <option value="1">1학기</option><option value="2">2학기</option>
+      </select></div>
+    <div class="ctrl-g"><span class="clabel">Grade</span>
+      <select id="selGrade" onchange="onFilterChange()">
+        <option value="">전체</option>
+        <option>7</option><option>8</option><option>9</option>
+        <option>10</option><option>11</option><option>12</option>
+      </select></div>
+    <div class="ctrl-g">
+      <select id="selSubject" class="sel-subject" onchange="onSubjectChange()">
+        <option value="">-- 과목/동아리 선택 --</option>
+      </select></div>
+    <div class="hsep"></div>
+    <div class="ctrl-g"><span class="clabel">Source</span>
+      <select id="selSrc"><option value="English">English</option><option value="Korean">Korean</option></select></div>
+    <div class="ctrl-g"><span class="clabel">→ Target</span>
+      <select id="selTgt"><option value="Korean">Korean</option><option value="English">English</option></select></div>
+    <div class="ctrl-g"><span class="clabel">Engine</span>
+      <select id="selEngine" onchange="onEngineChange()">
+        <option value="gpt">GPT</option><option value="claude">Claude</option></select></div>
+    <div class="ctrl-g"><span class="clabel">Model</span>
+      <select id="selModel"></select></div>
+    <div class="ctrl-g creat-wrap">
+      <span class="clabel">Creativity</span>
+      <input type="range" id="slCreat" min="0.1" max="0.9" step="0.1" value="0.5"
+        oninput="document.getElementById('vCreat').textContent=this.value">
+      <span class="creat-val" id="vCreat">0.5</span></div>
+    <button class="btn-icon" onclick="openPromptModal()">✏️ 프롬프트</button>
+    <button class="btn-teal" onclick="translateAll()">▶ 전체 번역</button>
+  </div>
+</div>
+
+<!-- 탭 -->
+<div id="tabs">
+  <div class="tab active" id="tab과목" onclick="switchTab('과목')">📚 과목 / Courses</div>
+  <div class="tab" id="tab동아리" onclick="switchTab('동아리')">🎭 동아리 / Clubs</div>
+</div>
+
+<!-- 메인 -->
+<div id="main">
+  <!-- 번역 뷰 -->
+  <div id="vTranslate">
+    <div class="empty-state" id="emptyTrans">
+      <div class="eicon">📋</div>
+      <p>과목 또는 동아리를 선택하세요.<br>Select a subject or club to begin.</p>
+    </div>
+    <table class="sheet" id="mainTable" style="display:none">
+      <thead id="mainHead"></thead>
+      <tbody id="mainBody"></tbody>
+    </table>
+  </div>
+
+  <!-- 검수 뷰 -->
+  <div id="vReview" style="display:none">
+    <div class="empty-state" id="emptyReview">
+      <div class="eicon">🔍</div><p>검수할 항목이 없습니다.</p>
+    </div>
+    <table class="sheet" id="reviewTable" style="display:none">
+      <thead id="reviewHead"></thead>
+      <tbody id="reviewBody"></tbody>
+    </table>
+  </div>
+
+  <!-- 관리 뷰 -->
+  <div id="vAdmin" style="display:none">
+    <div style="padding:20px">
+      <button class="btn-teal" onclick="openApiModal()" style="margin-right:8px">🔑 API 키 설정</button>
+      <button class="btn-icon" onclick="loadTeacherList()">👥 교사 권한 관리</button>
+      <div id="teacherList" style="margin-top:20px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 토스트 -->
+<div id="toast"></div>
+
+<!-- 프롬프트 모달 -->
+<div class="overlay" id="promptOverlay">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('promptOverlay')">×</button>
+    <h3>✏️ 번역 프롬프트</h3>
+    <div class="frow">
+      <label class="flabel">시스템 프롬프트 (비우면 기본값 사용)</label>
+      <textarea class="finput ftarea" id="promptText" rows="6"
+        placeholder="You are an expert Korean school record translator..."></textarea>
+    </div>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="closeModal('promptOverlay')">취소</button>
+      <button class="btn-save" onclick="savePrompt()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- API 키 모달 -->
+<div class="overlay" id="apiOverlay">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('apiOverlay')">×</button>
+    <h3>🔑 API 키 설정</h3>
+    <div class="frow">
+      <label class="flabel">OpenAI API Key</label>
+      <input type="password" class="finput" id="oaiKey" placeholder="sk-...">
+    </div>
+    <div class="frow">
+      <label class="flabel">Anthropic API Key</label>
+      <input type="password" class="finput" id="antKey" placeholder="sk-ant-...">
+    </div>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="closeModal('apiOverlay')">취소</button>
+      <button class="btn-save" onclick="saveApiKeys()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- URL 모달 -->
+<div class="overlay" id="urlOverlay">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('urlOverlay')">×</button>
+    <h3>🔗 Web App URL 설정</h3>
+    <p style="font-size:12px;color:var(--gray);margin-bottom:16px;line-height:1.7">
+      GAS 재배포 후 URL이 변경되면 새 URL을 입력하세요.</p>
+    <div class="frow">
+      <label class="flabel">현재 URL</label>
+      <div id="curUrl" style="font-size:11px;color:var(--teal);padding:6px 10px;
+        background:rgba(0,180,166,0.06);border-radius:6px;word-break:break-all;margin-bottom:10px">-</div>
+    </div>
+    <div class="frow">
+      <label class="flabel">새 URL</label>
+      <input class="finput" id="newUrl" placeholder="https://script.google.com/a/macros/.../exec">
+    </div>
+    <div style="font-size:11px;color:var(--gray);margin-top:4px">⚠️ 이 브라우저에만 저장됩니다.</div>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="closeModal('urlOverlay')">취소</button>
+      <button class="btn-sm danger" onclick="resetUrl()" style="margin-right:auto">초기화</button>
+      <button class="btn-save" onclick="saveUrl()">저장 후 새로고침</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
