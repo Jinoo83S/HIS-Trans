@@ -28,7 +28,11 @@ var API = (function() {
     var data = await res.json();
     if (data && data.error === 'unauthorized') {
       Auth.clear();
-      window.location.href = 'login.html';
+      // 이미 로그인 페이지면 리다이렉트 안 함 (무한루프 방지)
+      var p = window.location.pathname;
+      if (p.endsWith('app.html')) {
+        window.location.href = 'index.html';
+      }
       return;
     }
     return data;
