@@ -113,7 +113,8 @@ async function onSubjectChange() {
   showLoading('학생 목록 불러오는 중...');
 
   try {
-    var res = await API.getStudentsByCourse(APP.selectedSubject.subjectCode);
+    var isClub = APP.currentTab === '동아리';
+    var res = await API.getStudentsByCourse(APP.selectedSubject.subjectCode, isClub);
     hideLoading();
     if (!res.success) { toast('학생 로드 실패', 'error'); return; }
 
@@ -459,14 +460,8 @@ function renderTeacherTable() {
               `<option value="${r}" ${r===t.role?'selected':''}>${r}</option>`).join('')}
           </select>
         </div></td>
-        <td><div class="ci" id="assignWrap_${nameKey}">
-          ${isReviewer ? `<select id="assign_${nameKey}" multiple
-              style="border:1px solid var(--border);border-radius:4px;font-size:11px;
-              padding:3px;background:var(--bg);color:var(--text);min-width:120px;max-height:80px">
-              ${translators.map(tr =>
-                `<option value="${tr}" ${(t.assignedTo||'').split(',').includes(tr)?'selected':''}>${tr}</option>`
-              ).join('')}
-            </select>` : '<span style="color:var(--gray);font-size:11px">-</span>'}
+        <td><div class="ci" id="assignWrap_${nameKey}" style="min-width:160px">
+          ${isReviewer ? buildAssignDropdown(nameKey, translators, t.assignedTo||'') : '<span style="color:var(--gray);font-size:11px">-</span>'}
         </div></td>
         <td class="ca">
           <button class="btn-tr" onclick="saveTeacher('${nameKey}','${t.name}')">저장</button>
@@ -498,11 +493,7 @@ function onRoleChange(nameKey, name) {
   var wrap = document.getElementById('assignWrap_' + nameKey);
   var translators = _teacherData.filter(t => t.role === '번역').map(t => t.name);
   if (role === '검수') {
-    wrap.innerHTML = `<select id="assign_${nameKey}" multiple
-      style="border:1px solid var(--border);border-radius:4px;font-size:11px;
-      padding:3px;background:var(--bg);color:var(--text);min-width:120px;max-height:80px">
-      ${translators.map(tr => `<option value="${tr}">${tr}</option>`).join('')}
-    </select>`;
+    wrap.innerHTML = buildAssignDropdown(nameKey, translators, '');
   } else {
     wrap.innerHTML = '<span style="color:var(--gray);font-size:11px">-</span>';
   }
@@ -510,10 +501,7 @@ function onRoleChange(nameKey, name) {
 
 async function saveTeacher(nameKey, name) {
   var role = document.getElementById('role_' + nameKey)?.value;
-  var assignEl = document.getElementById('assign_' + nameKey);
-  var assigned = assignEl
-    ? Array.from(assignEl.selectedOptions).map(o => o.value).join(',')
-    : '';
+  var assigned = getAssignedValues(nameKey);
   try {
     var res = await API.updateTeacherRole(name, role, assigned);
     if (res.success) { toast(name + ' 저장 완료 ✓', 'success'); loadTeacherList(); }
@@ -542,6 +530,60 @@ async function addTeacher() {
     } else toast('추가 실패: ' + res.error, 'error');
   } catch(err) { toast(err.message, 'error'); }
 }
+
+// ── 번역담당 드롭다운 빌더 ──────────────────────────────────
+function buildAssignDropdown(nameKey, translators, assignedStr) {
+  var assigned = assignedStr ? assignedStr.split(',').map(s => s.trim()) : [];
+  var display = assigned.length ? assigned.join(', ') : '선택...';
+  return `<div class="assign-wrap" id="aw_${nameKey}">
+    <div class="assign-btn" onclick="toggleAssignList('${nameKey}')"
+      style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;
+      font-size:11px;cursor:pointer;background:var(--bg);min-width:140px;
+      display:flex;justify-content:space-between;align-items:center;gap:6px">
+      <span id="assign_label_${nameKey}" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${display}</span>
+      <span style="color:var(--gray)">▼</span>
+    </div>
+    <div id="assign_list_${nameKey}" style="display:none;position:absolute;z-index:100;
+      background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.1);min-width:160px;padding:4px 0">
+      ${translators.map(tr => `
+        <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;
+          cursor:pointer;font-size:12px;white-space:nowrap"
+          onmouseover="this.style.background='#e0f2fe'" onmouseout="this.style.background=''">
+          <input type="checkbox" value="${tr}" ${assigned.includes(tr)?'checked':''}
+            onchange="updateAssignLabel('${nameKey}')">
+          ${tr}
+        </label>`).join('')}
+    </div>
+  </div>`;
+}
+
+function toggleAssignList(nameKey) {
+  var list = document.getElementById('assign_list_' + nameKey);
+  list.style.display = list.style.display === 'none' ? 'block' : 'none';
+}
+
+function updateAssignLabel(nameKey) {
+  var checked = Array.from(
+    document.querySelectorAll('#assign_list_' + nameKey + ' input:checked')
+  ).map(cb => cb.value);
+  var label = document.getElementById('assign_label_' + nameKey);
+  label.textContent = checked.length ? checked.join(', ') : '선택...';
+}
+
+function getAssignedValues(nameKey) {
+  var checkboxes = document.querySelectorAll('#assign_list_' + nameKey + ' input[type=checkbox]:checked');
+  return Array.from(checkboxes).map(cb => cb.value).join(',');
+}
+
+// 외부 클릭 시 드롭다운 닫기
+document.addEventListener('click', function(ev) {
+  if (!ev.target.closest('.assign-wrap')) {
+    document.querySelectorAll('[id^="assign_list_"]').forEach(function(el) {
+      el.style.display = 'none';
+    });
+  }
+});
 
 // changeRole은 saveTeacher로 대체되었으나 하위호환 유지
 async function changeRole(name) {

@@ -52,7 +52,7 @@ var API = (function() {
     // 과목/학생
     getMySubjects:      (semester)              => call('getMySubjects', { semester }),
     getAllSubjects:      (semester)              => call('getAllSubjects', { semester }),
-    getStudentsByCourse:(subjectCode)           => call('getStudentsByCourse', { subjectCode }),
+    getStudentsByCourse:(subjectCode, isClub)   => call('getStudentsByCourse', { subjectCode, isClub }),
 
     // 번역
     translate:          (payload)               => call('translate', { payload }),
