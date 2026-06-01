@@ -15,8 +15,11 @@ var API = (function() {
 
     var res = await fetch(url, {
       method: 'POST',
-      // GAS CORS: content-type을 text/plain으로 해야 preflight 없음
-      headers: { 'Content-Type': 'text/plain' },
+      // GAS CORS: text/plain → preflight(OPTIONS) 없이 simple request로 전송
+      // GAS는 CORS 헤더를 응답에 추가하지 않으므로 no-cors 대신
+      // "누구나 액세스" 배포 + text/plain 조합이 유일한 해결책
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      redirect: 'follow',
       body: JSON.stringify(body)
     });
 
@@ -42,6 +45,7 @@ var API = (function() {
 
     // 과목/학생
     getMySubjects:      (semester)              => call('getMySubjects', { semester }),
+    getAllSubjects:      (semester)              => call('getAllSubjects', { semester }),
     getStudentsByCourse:(subjectCode)           => call('getStudentsByCourse', { subjectCode }),
 
     // 번역

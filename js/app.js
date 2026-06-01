@@ -60,8 +60,11 @@ function initUI() {
 // ── 과목 목록 ────────────────────────────────────────────────
 async function loadSubjects() {
   var sem = document.getElementById('selSem').value;
+  var isAdmin = APP.teacher && APP.teacher.role === '관리자';
   try {
-    var res = await API.getMySubjects(sem);
+    var res = isAdmin
+      ? await API.getAllSubjects(sem)
+      : await API.getMySubjects(sem);
     if (!res.success) { toast('과목 로드 실패', 'error'); return; }
     APP.subjects = res.data;
     renderSubjectSelect();
@@ -77,13 +80,15 @@ function renderSubjectSelect() {
     s.type === tab && (!grade || String(s.grade) === grade)
   );
 
+  var isAdmin = APP.teacher && APP.teacher.role === '관리자';
   sel.innerHTML = '<option value="">-- ' +
     (tab === '과목' ? '과목 선택' : '동아리 선택') + ' --</option>' +
-    filtered.map(s =>
-      `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>
-        ${s.nameKR} / ${s.nameEN} (G${s.grade})
-      </option>`
-    ).join('');
+    filtered.map(s => {
+      var teacherInfo = isAdmin && s.teachers && s.teachers.length
+        ? ' [' + s.teachers.join(', ') + ']' : '';
+      return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
+        `G${s.grade} | ${s.nameKR} / ${s.nameEN}${teacherInfo}</option>`;
+    }).join('');
 }
 
 async function onSubjectChange() {

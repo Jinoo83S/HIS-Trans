@@ -9,75 +9,72 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --navy: #0a1628; --navy2: #112240; --teal: #00b4a6; --teal2: #00d4c8;
-  --gold: #f5a623; --white: #f0f4f8; --gray: #8892a4; --red: #e74c3c;
-  --border: rgba(255,255,255,0.07);
+  --bg: #f0f4f8; --bg2: #ffffff; --bg3: #e8edf3;
+  --primary: #0369a1; --teal: #0891b2; --teal2: #06b6d4;
+  --text: #1e293b; --gray: #64748b; --red: #dc2626;
+  --border: #e2e8f0;
 }
-body { font-family: 'Noto Sans KR', sans-serif; background: var(--navy);
+body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg);
   min-height: 100vh; display: flex; align-items: center; justify-content: center; }
 body::before { content: ''; position: fixed; inset: 0;
-  background: radial-gradient(ellipse at 20% 50%, rgba(0,180,166,0.08) 0%, transparent 50%),
-              radial-gradient(ellipse at 80% 20%, rgba(245,166,35,0.06) 0%, transparent 40%);
+  background: radial-gradient(ellipse at 20% 50%, rgba(8,145,178,0.06) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 20%, rgba(3,105,161,0.04) 0%, transparent 40%);
   pointer-events: none; }
 .grid-bg { position: fixed; inset: 0;
-  background-image: linear-gradient(rgba(0,180,166,0.04) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(0,180,166,0.04) 1px, transparent 1px);
-  background-size: 40px 40px; pointer-events: none; }
+  background-image: linear-gradient(var(--border) 1px, transparent 1px),
+                    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px; pointer-events: none; opacity: 0.5; }
 .wrap { position: relative; z-index: 10; width: 100%; max-width: 420px; padding: 20px;
   animation: fadeUp 0.6s ease both; }
-@keyframes fadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
 .badge { text-align: center; margin-bottom: 32px; }
-.his { font-family: 'Bebas Neue', cursive; font-size: 56px; letter-spacing: 4px; color: var(--teal); line-height: 1; }
+.his { font-family: 'Bebas Neue', cursive; font-size: 56px; letter-spacing: 4px; color: var(--primary); line-height: 1; }
 .sub { font-size: 11px; letter-spacing: 3px; color: var(--gray); text-transform: uppercase; margin-top: 4px; }
-.card { background: var(--navy2); border: 1px solid rgba(0,180,166,0.2); border-radius: 16px;
-  padding: 36px 32px; box-shadow: 0 24px 64px rgba(0,0,0,0.4); }
-.card-title { font-size: 18px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px;
+  padding: 36px 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+.card-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
 .card-sub { font-size: 12px; color: var(--gray); margin-bottom: 28px; }
 .field { margin-bottom: 16px; }
-.field label { display: block; font-size: 11px; font-weight: 500; color: var(--teal);
+.field label { display: block; font-size: 11px; font-weight: 600; color: var(--teal);
   letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
-.field input { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px; color: var(--white); font-family: 'Noto Sans KR', sans-serif;
+.field input { width: 100%; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-family: 'Noto Sans KR', sans-serif;
   font-size: 14px; padding: 12px 14px; outline: none; transition: border-color 0.2s; }
-.field input:focus { border-color: var(--teal); background: rgba(0,180,166,0.06); }
-.field input::placeholder { color: rgba(255,255,255,0.2); }
-.btn-login { width: 100%; background: var(--teal); color: var(--navy); border: none;
+.field input:focus { border-color: var(--teal); background: #f0f9ff; }
+.field input::placeholder { color: #94a3b8; }
+.btn-login { width: 100%; background: var(--teal); color: #fff; border: none;
   border-radius: 8px; font-family: 'Noto Sans KR', sans-serif; font-size: 14px; font-weight: 700;
   padding: 13px; cursor: pointer; margin-top: 8px; transition: background 0.2s; }
 .btn-login:hover { background: var(--teal2); }
-.btn-login:disabled { background: var(--gray); cursor: not-allowed; }
-.error { margin-top: 12px; padding: 10px 12px; background: rgba(231,76,60,0.1);
-  border: 1px solid rgba(231,76,60,0.3); border-radius: 6px; color: var(--red);
+.btn-login:disabled { background: #94a3b8; cursor: not-allowed; }
+.error { margin-top: 12px; padding: 10px 12px; background: #fff1f2;
+  border: 1px solid #fca5a5; border-radius: 6px; color: var(--red);
   font-size: 12px; text-align: center; display: none; }
-.divider { height: 1px; background: rgba(255,255,255,0.06); margin: 24px 0; }
+.divider { height: 1px; background: var(--border); margin: 24px 0; }
 .note { text-align: center; font-size: 11px; color: var(--gray); line-height: 1.6; }
 .url-btn { background: none; border: none; color: var(--gray); font-size: 11px;
   cursor: pointer; text-decoration: underline; font-family: 'Noto Sans KR', sans-serif;
   margin-top: 12px; display: block; width: 100%; text-align: center; }
 .url-btn:hover { color: var(--teal); }
-
-/* URL 모달 */
-.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100;
+.overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.4); z-index: 100;
   display: none; align-items: center; justify-content: center; }
 .overlay.open { display: flex; }
-.modal { background: var(--navy2); border: 1px solid rgba(0,180,166,0.3);
-  border-radius: 12px; padding: 24px; width: 90%; max-width: 480px; }
-.modal h3 { font-size: 15px; color: var(--white); margin-bottom: 8px; }
+.modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px; width: 90%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.12); }
+.modal h3 { font-size: 15px; color: var(--text); margin-bottom: 8px; }
 .modal p { font-size: 11px; color: var(--gray); line-height: 1.7; margin-bottom: 16px; }
-.modal-label { font-size: 10px; color: var(--teal); letter-spacing: 0.5px; margin-bottom: 6px; display: block; }
-.modal-cur { font-size: 11px; color: var(--teal); padding: 6px 10px;
-  background: rgba(0,180,166,0.06); border-radius: 6px; word-break: break-all; margin-bottom: 12px; }
-.modal-input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-  color: var(--white); font-size: 12px; padding: 8px 10px; border-radius: 6px; outline: none;
+.modal-label { font-size: 10px; color: var(--teal); letter-spacing: 0.5px; margin-bottom: 6px; display: block; font-weight: 600; }
+.modal-cur { font-size: 11px; color: var(--primary); padding: 6px 10px;
+  background: #e0f2fe; border-radius: 6px; word-break: break-all; margin-bottom: 12px; }
+.modal-input { width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-size: 12px; padding: 8px 10px; border-radius: 6px; outline: none;
   font-family: 'Noto Sans KR', sans-serif; }
 .modal-input:focus { border-color: var(--teal); }
 .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-.btn-cancel { background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--gray);
-  border-radius: 6px; font-size: 12px; padding: 8px 16px; cursor: pointer;
-  font-family: 'Noto Sans KR', sans-serif; }
-.btn-save { background: var(--teal); color: var(--navy); border: none; border-radius: 6px;
-  font-size: 12px; font-weight: 700; padding: 8px 20px; cursor: pointer;
-  font-family: 'Noto Sans KR', sans-serif; }
+.btn-cancel { background: var(--bg); border: 1px solid var(--border); color: var(--gray);
+  border-radius: 6px; font-size: 12px; padding: 8px 16px; cursor: pointer; font-family: 'Noto Sans KR', sans-serif; }
+.btn-save { background: var(--teal); color: #fff; border: none; border-radius: 6px;
+  font-size: 12px; font-weight: 700; padding: 8px 20px; cursor: pointer; font-family: 'Noto Sans KR', sans-serif; }
 </style>
 </head>
 <body>
