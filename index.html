@@ -111,7 +111,7 @@ body::before { content: ''; position: fixed; inset: 0;
       <label>비밀번호 / Password</label>
       <input type="password" id="pw" placeholder="휴대폰 뒷 4자리" autocomplete="current-password">
     </div>
-    <button class="btn-login" id="loginBtn" onclick="doLogin()">로그인 / Login</button>
+    <button type="button" class="btn-login" id="loginBtn" onclick="doLogin()">로그인 / Login</button>
     <div class="error" id="err"></div>
     <div class="divider"></div>
     <div class="note">비밀번호는 휴대폰 번호 뒷 4자리입니다.<br>Password is the last 4 digits of your phone number.</div>
@@ -152,7 +152,7 @@ body::before { content: ''; position: fixed; inset: 0;
     loadTeacherNames();
   };
 
-  document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doLogin(); } });
 
   async function doLogin() {
     var name = document.getElementById('name').value.trim();
