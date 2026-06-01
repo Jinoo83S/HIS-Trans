@@ -76,7 +76,12 @@ body::before { content: ''; position: fixed; inset: 0;
 .btn-save { background: var(--teal); color: #fff; border: none; border-radius: 6px;
   font-size: 12px; font-weight: 700; padding: 8px 20px; cursor: pointer; font-family: 'Noto Sans KR', sans-serif; }
 
-.ac-wrap { position: relative; }
+.ac-wrap { position: relative; display: flex; }
+.ac-wrap input { flex: 1; border-radius: 8px 0 0 8px !important; }
+.ac-toggle { background: var(--bg3); border: 1px solid var(--border); border-left: none;
+  border-radius: 0 8px 8px 0; padding: 0 12px; cursor: pointer; color: var(--gray);
+  font-size: 11px; transition: background 0.15s; white-space: nowrap; }
+.ac-toggle:hover { background: #e0f2fe; color: var(--primary); }
 .ac-list { position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
   background: var(--bg2); border: 1px solid var(--border); border-top: none;
   border-radius: 0 0 8px 8px; max-height: 200px; overflow-y: auto;
@@ -104,6 +109,7 @@ body::before { content: ''; position: fixed; inset: 0;
         <input type="text" id="name" placeholder="예: Henry / 홍길동"
           autocomplete="off" oninput="onNameInput(this.value)"
           onkeydown="onNameKey(event)">
+        <button type="button" class="ac-toggle" onclick="toggleAcList()">▼</button>
         <div class="ac-list" id="acList"></div>
       </div>
     </div>
@@ -221,6 +227,38 @@ body::before { content: ''; position: fixed; inset: 0;
     );
     if (!filtered.length) { list.classList.remove('open'); return; }
     list.innerHTML = filtered.map((n, i) =>
+      `<div class="ac-item" data-name="${n}" onmousedown="selectName('${n}')">${n}</div>`
+    ).join('');
+    list.classList.add('open');
+  }
+
+  function toggleAcList() {
+    var list = document.getElementById('acList');
+    if (list.classList.contains('open')) {
+      list.classList.remove('open');
+      return;
+    }
+    // 전체 목록 표시
+    var names = _allNames.length ? _allNames : [];
+    if (!names.length) {
+      // 아직 로드 안 됐으면 다시 시도
+      loadTeacherNames().then(function() {
+        showAllNames();
+      });
+    } else {
+      showAllNames();
+    }
+    document.getElementById('name').focus();
+  }
+
+  function showAllNames() {
+    var list = document.getElementById('acList');
+    var cur = document.getElementById('name').value.toLowerCase();
+    var names = cur
+      ? _allNames.filter(n => n.toLowerCase().includes(cur))
+      : _allNames;
+    if (!names.length) return;
+    list.innerHTML = names.map(n =>
       `<div class="ac-item" data-name="${n}" onmousedown="selectName('${n}')">${n}</div>`
     ).join('');
     list.classList.add('open');
