@@ -74,11 +74,18 @@ function initUI() {
 // ── 과목 목록 ────────────────────────────────────────────────
 async function loadSubjects() {
   var sem = document.getElementById('selSem').value;
-  var isAdmin = APP.teacher && APP.teacher.role === '관리자';
+  var role = APP.teacher && APP.teacher.role;
   try {
-    var res = isAdmin
-      ? await API.getAllSubjects(sem)
-      : await API.getMySubjects(sem);
+    var res;
+    if (role === '관리자') {
+      res = await API.getAllSubjects(sem);
+    } else if (role === '검수') {
+      // 담당 번역교사의 과목만
+      res = await API.getReviewerSubjects(sem);
+    } else {
+      // 번역 교사: 본인 과목만
+      res = await API.getMySubjects(sem);
+    }
     if (!res.success) { toast('과목 로드 실패', 'error'); return; }
     APP.subjects = res.data;
     renderSubjectSelect();
