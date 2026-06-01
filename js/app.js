@@ -353,10 +353,15 @@ async function checkNeis(i) {
 // ── 검수 뷰 ─────────────────────────────────────────────────
 async function loadReviewList() {
   showLoading('검수 목록 불러오는 중...');
+  var t = APP.teacher;
   var filters = {
     year: document.getElementById('selYear').value,
     semester: document.getElementById('selSem').value
   };
+  // 검수 교사: 담당 번역교사 필터 적용
+  if (t.role === '검수' && t.assignedTo) {
+    filters.assignedTeachers = t.assignedTo.split(',').map(s => s.trim()).filter(Boolean);
+  }
   try {
     var res = await API.getTransList(filters);
     hideLoading();
@@ -417,40 +422,131 @@ function copyReview(rowIndex) {
 }
 
 // ── 관리 뷰 ─────────────────────────────────────────────────
+var _teacherData = [];
+
 async function loadTeacherList() {
   try {
     var res = await API.getTeachers();
     if (!res.success) { toast('로드 실패', 'error'); return; }
-    document.getElementById('teacherList').innerHTML =
-      '<table class="sheet"><thead><tr>' +
-      '<th>이름</th><th>Full Name</th><th>이메일</th><th>홈룸</th><th>현재 권한</th><th>변경</th>' +
-      '</tr></thead><tbody>' +
-      res.data.map(t => `<tr>
-        <td><div class="ci">${e(t.name)}</div></td>
-        <td><div class="ci">${e(t.fullName)}</div></td>
-        <td><div class="ci" style="font-size:11px">${e(t.email)}</div></td>
-        <td><div class="ci">${e(t.homeroom)}</div></td>
-        <td><div class="ci"><span class="role-badge role-${t.role}">${t.role}</span></div></td>
-        <td class="ca">
-          <select id="role_${t.name}" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);
-            color:var(--white);font-size:11px;padding:4px;border-radius:4px;margin-bottom:4px">
-            ${['번역','검수','관리자','일반'].map(r =>
-              `<option value="${r}" ${r===t.role?'selected':''}>${r}</option>`).join('')}
-          </select><br>
-          <button class="btn-tr" onclick="changeRole('${t.name}')">변경</button>
-        </td>
-      </tr>`).join('') +
-      '</tbody></table>';
-  } catch(e) { toast(e.message, 'error'); }
+    _teacherData = res.data;
+    renderTeacherTable();
+  } catch(err) { toast(err.message, 'error'); }
 }
 
-async function changeRole(name) {
-  var role = document.getElementById('role_' + name)?.value;
+function renderTeacherTable() {
+  var data = _teacherData;
+  var translators = data.filter(t => t.role === '번역').map(t => t.name);
+
+  var html = '<div class="admin-section">' +
+    '<h4>👥 교사 권한 관리</h4>' +
+    '<table class="sheet" style="min-width:100%"><thead><tr>' +
+    '<th>이름</th><th>Full Name</th><th>이메일</th><th>홈룸</th>' +
+    '<th>동아리</th><th>권한</th><th>번역담당</th><th style="min-width:120px">변경</th>' +
+    '</tr></thead><tbody>' +
+    data.map(t => {
+      var nameKey = t.name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
+      var isReviewer = t.role === '검수';
+      return `<tr id="trow_${nameKey}">
+        <td><div class="ci">${e(t.name)}</div></td>
+        <td><div class="ci" style="font-size:11px">${e(t.fullName)}</div></td>
+        <td><div class="ci" style="font-size:11px">${e(t.email)}</div></td>
+        <td><div class="ci">${e(t.homeroom)}</div></td>
+        <td><div class="ci" style="font-size:11px">${e(t.club||'')}</div></td>
+        <td><div class="ci">
+          <select id="role_${nameKey}" onchange="onRoleChange('${nameKey}','${t.name}')"
+            style="border:1px solid var(--border);border-radius:4px;font-size:11px;padding:3px 6px;background:var(--bg);color:var(--text)">
+            ${['번역','검수','관리자','일반'].map(r =>
+              `<option value="${r}" ${r===t.role?'selected':''}>${r}</option>`).join('')}
+          </select>
+        </div></td>
+        <td><div class="ci" id="assignWrap_${nameKey}">
+          ${isReviewer ? `<select id="assign_${nameKey}" multiple
+              style="border:1px solid var(--border);border-radius:4px;font-size:11px;
+              padding:3px;background:var(--bg);color:var(--text);min-width:120px;max-height:80px">
+              ${translators.map(tr =>
+                `<option value="${tr}" ${(t.assignedTo||'').split(',').includes(tr)?'selected':''}>${tr}</option>`
+              ).join('')}
+            </select>` : '<span style="color:var(--gray);font-size:11px">-</span>'}
+        </div></td>
+        <td class="ca">
+          <button class="btn-tr" onclick="saveTeacher('${nameKey}','${t.name}')">저장</button>
+        </td>
+      </tr>`;
+    }).join('') +
+    '</tbody></table></div>' +
+
+    // 교사 추가
+    '<div class="admin-section"><h4>➕ 교사 추가</h4>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">' +
+    '<div><div class="flabel">이름</div><input class="finput" id="new_name" placeholder="홍길동" style="width:100px"></div>' +
+    '<div><div class="flabel">Full Name</div><input class="finput" id="new_fullname" placeholder="Mr. Gil Dong Hong" style="width:180px"></div>' +
+    '<div><div class="flabel">이메일</div><input class="finput" id="new_email" placeholder="email@his.sc.kr" style="width:180px"></div>' +
+    '<div><div class="flabel">홈룸</div><input class="finput" id="new_homeroom" placeholder="7A" style="width:60px"></div>' +
+    '<div><div class="flabel">동아리</div><input class="finput" id="new_club" placeholder="" style="width:120px"></div>' +
+    '<div><div class="flabel">비밀번호</div><input class="finput" id="new_pw" placeholder="뒷4자리" style="width:80px"></div>' +
+    '<div><div class="flabel">권한</div><select class="finput" id="new_role" style="width:80px">' +
+    ['번역','검수','관리자','일반'].map(r => `<option>${r}</option>`).join('') +
+    '</select></div>' +
+    '<button class="btn-teal" onclick="addTeacher()">추가</button>' +
+    '</div></div>';
+
+  document.getElementById('teacherList').innerHTML = html;
+}
+
+function onRoleChange(nameKey, name) {
+  var role = document.getElementById('role_' + nameKey)?.value;
+  var wrap = document.getElementById('assignWrap_' + nameKey);
+  var translators = _teacherData.filter(t => t.role === '번역').map(t => t.name);
+  if (role === '검수') {
+    wrap.innerHTML = `<select id="assign_${nameKey}" multiple
+      style="border:1px solid var(--border);border-radius:4px;font-size:11px;
+      padding:3px;background:var(--bg);color:var(--text);min-width:120px;max-height:80px">
+      ${translators.map(tr => `<option value="${tr}">${tr}</option>`).join('')}
+    </select>`;
+  } else {
+    wrap.innerHTML = '<span style="color:var(--gray);font-size:11px">-</span>';
+  }
+}
+
+async function saveTeacher(nameKey, name) {
+  var role = document.getElementById('role_' + nameKey)?.value;
+  var assignEl = document.getElementById('assign_' + nameKey);
+  var assigned = assignEl
+    ? Array.from(assignEl.selectedOptions).map(o => o.value).join(',')
+    : '';
   try {
-    var res = await API.updateTeacherRole(name, role);
-    if (res.success) toast(name + ' 권한 변경 완료 ✓', 'success');
-    else toast('변경 실패', 'error');
-  } catch(e) { toast(e.message, 'error'); }
+    var res = await API.updateTeacherRole(name, role, assigned);
+    if (res.success) { toast(name + ' 저장 완료 ✓', 'success'); loadTeacherList(); }
+    else toast('저장 실패', 'error');
+  } catch(err) { toast(err.message, 'error'); }
+}
+
+async function addTeacher() {
+  var teacher = {
+    name:     document.getElementById('new_name').value.trim(),
+    fullName: document.getElementById('new_fullname').value.trim(),
+    email:    document.getElementById('new_email').value.trim(),
+    homeroom: document.getElementById('new_homeroom').value.trim(),
+    club:     document.getElementById('new_club').value.trim(),
+    password: document.getElementById('new_pw').value.trim(),
+    role:     document.getElementById('new_role').value
+  };
+  if (!teacher.name || !teacher.password) { toast('이름과 비밀번호는 필수입니다.', 'error'); return; }
+  try {
+    var res = await API.addTeacher(teacher);
+    if (res.success) {
+      toast('교사 추가 완료 ✓', 'success');
+      ['name','fullname','email','homeroom','club','pw'].forEach(f =>
+        document.getElementById('new_' + f).value = '');
+      loadTeacherList();
+    } else toast('추가 실패: ' + res.error, 'error');
+  } catch(err) { toast(err.message, 'error'); }
+}
+
+// changeRole은 saveTeacher로 대체되었으나 하위호환 유지
+async function changeRole(name) {
+  var nameKey = name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
+  await saveTeacher(nameKey, name);
 }
 
 function openApiModal() { document.getElementById('apiOverlay').classList.add('open'); }

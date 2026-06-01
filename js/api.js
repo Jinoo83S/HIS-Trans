@@ -46,7 +46,8 @@ var API = (function() {
     // 교사
     getMe:              ()                      => call('getMe'),
     getTeachers:        ()                      => call('getTeachers'),
-    updateTeacherRole:  (name, role)            => call('updateTeacherRole', { name, role }),
+    updateTeacherRole:  (name, role, assigned)   => call('updateTeacherRole', { name, role, assigned }),
+    addTeacher:         (teacher)               => call('addTeacher', { teacher }),
 
     // 과목/학생
     getMySubjects:      (semester)              => call('getMySubjects', { semester }),
