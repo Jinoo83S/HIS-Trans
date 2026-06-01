@@ -95,14 +95,46 @@ function renderSubjectSelect() {
   );
 
   var isAdmin = APP.teacher && APP.teacher.role === '관리자';
-  sel.innerHTML = '<option value="">-- ' +
-    (tab === '과목' ? '과목 선택' : '동아리 선택') + ' --</option>' +
-    filtered.map(s => {
-      var teacherInfo = isAdmin && s.teachers && s.teachers.length
-        ? ' [' + s.teachers.join(', ') + ']' : '';
-      return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
-        `G${s.grade} | ${s.nameKR} / ${s.nameEN}${teacherInfo}</option>`;
-    }).join('');
+
+  // 관리자: 교사명 기준 정렬, 동일 교사면 학년 순
+  if (isAdmin) {
+    filtered.sort(function(a, b) {
+      var ta = (a.teachers && a.teachers[0]) || '';
+      var tb = (b.teachers && b.teachers[0]) || '';
+      if (ta !== tb) return ta.localeCompare(tb, 'ko');
+      return String(a.grade).localeCompare(String(b.grade));
+    });
+  }
+
+  // 관리자: 교사별 구분선(optgroup) 적용
+  if (isAdmin) {
+    var groups = {};
+    var groupOrder = [];
+    filtered.forEach(function(s) {
+      var teacher = (s.teachers && s.teachers[0]) || '(미배정)';
+      if (!groups[teacher]) { groups[teacher] = []; groupOrder.push(teacher); }
+      groups[teacher].push(s);
+    });
+
+    sel.innerHTML = '<option value="">-- ' +
+      (tab === '과목' ? '과목 선택' : '동아리 선택') + ' --</option>' +
+      groupOrder.map(function(teacher) {
+        var opts = groups[teacher].map(function(s) {
+          var allTeachers = s.teachers && s.teachers.length > 1
+            ? ' [' + s.teachers.join(', ') + ']' : '';
+          return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
+            `G${s.grade} | ${s.nameKR}${allTeachers}</option>`;
+        }).join('');
+        return `<optgroup label="👤 ${teacher}">${opts}</optgroup>`;
+      }).join('');
+  } else {
+    sel.innerHTML = '<option value="">-- ' +
+      (tab === '과목' ? '과목 선택' : '동아리 선택') + ' --</option>' +
+      filtered.map(function(s) {
+        return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
+          `${s.nameKR} / ${s.nameEN}</option>`;
+      }).join('');
+  }
 }
 
 async function onSubjectChange() {
