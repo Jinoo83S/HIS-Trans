@@ -143,8 +143,12 @@ body::before { content: ''; position: fixed; inset: 0;
 <script>
   // 이미 로그인 상태면 앱으로
   window.onload = function() {
-    if (!Config.isSet()) openUrlModal();
-    if (Auth.isLoggedIn()) { window.location.href = 'app.html'; return; }
+    // URL 미설정 시 모달 열기
+    if (!Config.isSet()) {
+      openUrlModal();
+      return;
+    }
+    // 교사 이름 목록 로드 (오류 무시)
     loadTeacherNames();
   };
 

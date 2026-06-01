@@ -23,11 +23,24 @@ window.onload = async function() {
 
   try {
     var res = await API.getMe();
-    if (!res || !res.success) { Auth.clear(); window.location.href = 'login.html'; return; }
-    APP.teacher = res.data;
+    if (!res) { window.location.href = 'login.html'; return; }
+    if (res.error === 'unauthorized') {
+      // 진짜 인증 오류만 clear
+      Auth.clear();
+      window.location.href = 'login.html';
+      return;
+    }
+    if (res.success && res.data) {
+      APP.teacher = res.data;
+      Auth.set(Auth.getToken(), res.data); // 최신 교사 정보 갱신
+    } else {
+      // 기타 오류 → 캐시 사용
+      APP.teacher = Auth.getTeacher();
+    }
+    if (!APP.teacher) { window.location.href = 'login.html'; return; }
     initUI();
   } catch(e) {
-    // 네트워크 오류 시 캐시된 교사 정보 사용
+    // 네트워크 오류 → 캐시된 정보로 진행
     APP.teacher = Auth.getTeacher();
     if (!APP.teacher) { window.location.href = 'login.html'; return; }
     initUI();
