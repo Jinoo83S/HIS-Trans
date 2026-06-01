@@ -435,6 +435,38 @@ async function saveRow(i) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+// ── 일괄 저장 ──────────────────────────────────────────────────
+async function saveAll() {
+  var s = APP.selectedSubject;
+  if (!s) { toast('과목을 선택하세요.', 'error'); return; }
+
+  // 내용이 있고 미저장인 행만 대상
+  var targets = APP.rows.filter(r => (r.sourceText || r.translatedDraft) && !r.rowIndex);
+  if (!targets.length) {
+    toast('저장할 항목이 없습니다. (이미 모두 저장됨)', 'success'); return;
+  }
+
+  var btn = document.getElementById('btnSaveAll');
+  if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
+
+  var ok = 0, fail = 0;
+  for (var idx = 0; idx < targets.length; idx++) {
+    var i = APP.rows.indexOf(targets[idx]);
+    try {
+      await saveRow(i);
+      ok++;
+    } catch(err) {
+      fail++;
+    }
+    // 진행 상황 버튼에 표시
+    if (btn) btn.textContent = '저장 중... ' + (idx+1) + '/' + targets.length;
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '💾 일괄 저장'; }
+  toast('일괄 저장 완료: ' + ok + '건 성공' + (fail ? ', ' + fail + '건 실패' : '') + ' ✓', fail ? 'error' : 'success');
+  renderTable(); // 상태 아이콘 갱신
+}
+
 // ── NEIS 검토 ────────────────────────────────────────────────
 // ── 단어 단위 diff ────────────────────────────────────────────
 function buildDiffHtml(original, modified) {
