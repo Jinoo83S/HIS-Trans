@@ -12,7 +12,8 @@ var APP = {
   prompt: '',
   models: {
     gpt:    ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-    claude: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001']
+    claude: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
+    google: ['google-translate']
   }
 };
 
@@ -243,7 +244,14 @@ function switchTab(tab) {
 function onEngineChange() {
   var engine = document.getElementById('selEngine').value;
   var sel = document.getElementById('selModel');
-  sel.innerHTML = APP.models[engine].map(m => `<option value="${m}">${m}</option>`).join('');
+  sel.innerHTML = (APP.models[engine] || []).map(m => `<option value="${m}">${m}</option>`).join('');
+
+  // Google은 모델/Creativity 불필요 → 숨김
+  var isGoogle = engine === 'google';
+  var modelCtrl = document.getElementById('selModel').closest('.ctrl-g');
+  var creatCtrl = document.getElementById('slCreat')?.closest('.ctrl-g');
+  if (modelCtrl) modelCtrl.style.display = isGoogle ? 'none' : '';
+  if (creatCtrl) creatCtrl.style.display = isGoogle ? 'none' : '';
 }
 
 function setView(btn) {
@@ -281,8 +289,13 @@ async function translateRow(i) {
   try {
     var res = await API.translate(getPayload(row));
     row.translating = false;
-    if (!res.success) { toast('번역 실패: ' + res.error, 'error'); }
-    else {
+    if (!res.success) {
+      if (res.error && res.error.startsWith('NO_API_KEY:')) {
+        showApiKeyAlert(res.error.replace('NO_API_KEY:', ''));
+      } else {
+        toast('번역 실패: ' + res.error, 'error');
+      }
+    } else {
       row.translatedDraft = res.text;
       if (!row.finalText) row.finalText = res.text;
       toast('번역 완료 ✓', 'success');
@@ -624,6 +637,33 @@ function resetUrl() {
 }
 
 // ── 유틸 ────────────────────────────────────────────────────
+function showApiKeyAlert(msg) {
+  var overlay = document.getElementById('apiKeyAlertOverlay');
+  var msgEl   = document.getElementById('apiKeyAlertMsg');
+  if (!overlay) {
+    // 동적 생성
+    overlay = document.createElement('div');
+    overlay.id = 'apiKeyAlertOverlay';
+    overlay.className = 'overlay open';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:420px;text-align:center">
+        <div style="font-size:32px;margin-bottom:12px">🔑</div>
+        <h3 style="margin-bottom:10px">API 키 필요 / API Key Required</h3>
+        <p id="apiKeyAlertMsg" style="margin-bottom:20px;font-size:13px;color:var(--text)"></p>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button class="btn-cancel" onclick="document.getElementById('apiKeyAlertOverlay').classList.remove('open')">닫기</button>
+          <button class="btn-save" onclick="document.getElementById('apiKeyAlertOverlay').classList.remove('open');openApiModal()">
+            API 키 설정하기
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+  } else {
+    overlay.classList.add('open');
+  }
+  document.getElementById('apiKeyAlertMsg').textContent = msg;
+}
+
 function openPromptModal() {
   document.getElementById('promptText').value = APP.prompt;
   document.getElementById('promptOverlay').classList.add('open');
