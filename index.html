@@ -1,4 +1,271 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<meta http-equiv="refresh" content="0; url=login.html">
-</head><body></body></html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HIS 생기부 번역 시스템</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f0f4f8; --bg2: #ffffff; --bg3: #e8edf3;
+  --primary: #0369a1; --teal: #0891b2; --teal2: #06b6d4;
+  --text: #1e293b; --gray: #64748b; --red: #dc2626;
+  --border: #e2e8f0;
+}
+body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg);
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+body::before { content: ''; position: fixed; inset: 0;
+  background: radial-gradient(ellipse at 20% 50%, rgba(8,145,178,0.06) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 20%, rgba(3,105,161,0.04) 0%, transparent 40%);
+  pointer-events: none; }
+.grid-bg { position: fixed; inset: 0;
+  background-image: linear-gradient(var(--border) 1px, transparent 1px),
+                    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px; pointer-events: none; opacity: 0.5; }
+.wrap { position: relative; z-index: 10; width: 100%; max-width: 420px; padding: 20px;
+  animation: fadeUp 0.6s ease both; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+.badge { text-align: center; margin-bottom: 32px; }
+.his { font-family: 'Bebas Neue', cursive; font-size: 56px; letter-spacing: 4px; color: var(--primary); line-height: 1; }
+.sub { font-size: 11px; letter-spacing: 3px; color: var(--gray); text-transform: uppercase; margin-top: 4px; }
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px;
+  padding: 36px 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+.card-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.card-sub { font-size: 12px; color: var(--gray); margin-bottom: 28px; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 11px; font-weight: 600; color: var(--teal);
+  letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+.field input { width: 100%; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-family: 'Noto Sans KR', sans-serif;
+  font-size: 14px; padding: 12px 14px; outline: none; transition: border-color 0.2s; }
+.field input:focus { border-color: var(--teal); background: #f0f9ff; }
+.field input::placeholder { color: #94a3b8; }
+.btn-login { width: 100%; background: var(--teal); color: #fff; border: none;
+  border-radius: 8px; font-family: 'Noto Sans KR', sans-serif; font-size: 14px; font-weight: 700;
+  padding: 13px; cursor: pointer; margin-top: 8px; transition: background 0.2s; }
+.btn-login:hover { background: var(--teal2); }
+.btn-login:disabled { background: #94a3b8; cursor: not-allowed; }
+.error { margin-top: 12px; padding: 10px 12px; background: #fff1f2;
+  border: 1px solid #fca5a5; border-radius: 6px; color: var(--red);
+  font-size: 12px; text-align: center; display: none; }
+.divider { height: 1px; background: var(--border); margin: 24px 0; }
+.note { text-align: center; font-size: 11px; color: var(--gray); line-height: 1.6; }
+.url-btn { background: none; border: none; color: var(--gray); font-size: 11px;
+  cursor: pointer; text-decoration: underline; font-family: 'Noto Sans KR', sans-serif;
+  margin-top: 12px; display: block; width: 100%; text-align: center; }
+.url-btn:hover { color: var(--teal); }
+.overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.4); z-index: 100;
+  display: none; align-items: center; justify-content: center; }
+.overlay.open { display: flex; }
+.modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px; width: 90%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.12); }
+.modal h3 { font-size: 15px; color: var(--text); margin-bottom: 8px; }
+.modal p { font-size: 11px; color: var(--gray); line-height: 1.7; margin-bottom: 16px; }
+.modal-label { font-size: 10px; color: var(--teal); letter-spacing: 0.5px; margin-bottom: 6px; display: block; font-weight: 600; }
+.modal-cur { font-size: 11px; color: var(--primary); padding: 6px 10px;
+  background: #e0f2fe; border-radius: 6px; word-break: break-all; margin-bottom: 12px; }
+.modal-input { width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-size: 12px; padding: 8px 10px; border-radius: 6px; outline: none;
+  font-family: 'Noto Sans KR', sans-serif; }
+.modal-input:focus { border-color: var(--teal); }
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.btn-cancel { background: var(--bg); border: 1px solid var(--border); color: var(--gray);
+  border-radius: 6px; font-size: 12px; padding: 8px 16px; cursor: pointer; font-family: 'Noto Sans KR', sans-serif; }
+.btn-save { background: var(--teal); color: #fff; border: none; border-radius: 6px;
+  font-size: 12px; font-weight: 700; padding: 8px 20px; cursor: pointer; font-family: 'Noto Sans KR', sans-serif; }
+
+.ac-wrap { position: relative; }
+.ac-list { position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+  background: var(--bg2); border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 8px 8px; max-height: 200px; overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: none; }
+.ac-list.open { display: block; }
+.ac-item { padding: 10px 14px; font-size: 13px; color: var(--text); cursor: pointer;
+  border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.ac-item:last-child { border-bottom: none; }
+.ac-item:hover, .ac-item.selected { background: #e0f2fe; color: var(--primary); }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="wrap">
+  <div class="badge">
+    <div class="his">HIS</div>
+    <div class="sub">Handong International School</div>
+  </div>
+  <div class="card">
+    <div class="card-title">생기부 번역 시스템</div>
+    <div class="card-sub">School Record Translation System</div>
+    <div class="field">
+      <label>이름 / Name</label>
+      <div class="ac-wrap">
+        <input type="text" id="name" placeholder="예: Henry / 홍길동"
+          autocomplete="off" oninput="onNameInput(this.value)" onfocus="onNameInput(this.value)"
+          onkeydown="onNameKey(event)">
+        <div class="ac-list" id="acList"></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>비밀번호 / Password</label>
+      <input type="password" id="pw" placeholder="휴대폰 뒷 4자리" autocomplete="current-password">
+    </div>
+    <button class="btn-login" id="loginBtn" onclick="doLogin()">로그인 / Login</button>
+    <div class="error" id="err"></div>
+    <div class="divider"></div>
+    <div class="note">비밀번호는 휴대폰 번호 뒷 4자리입니다.<br>Password is the last 4 digits of your phone number.</div>
+    <button class="url-btn" onclick="openUrlModal()">🔗 Web App URL 설정</button>
+  </div>
+</div>
+
+<!-- URL 모달 -->
+<div class="overlay" id="urlOverlay">
+  <div class="modal">
+    <h3>🔗 Web App URL 설정</h3>
+    <p>GAS 재배포 후 URL이 변경되면 새 URL을 입력하세요.<br>
+       Enter the new URL if it changed after redeployment.</p>
+    <span class="modal-label">현재 저장된 URL</span>
+    <div class="modal-cur" id="curUrl">(없음)</div>
+    <span class="modal-label">새 URL / New URL</span>
+    <input class="modal-input" id="newUrl"
+      placeholder="https://script.google.com/a/macros/.../exec">
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeUrlModal()">취소</button>
+      <button class="btn-save" onclick="saveUrl()">저장 / Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script>
+  // 이미 로그인 상태면 앱으로
+  window.onload = function() {
+    // URL 미설정 시 모달 열기
+    if (!Config.isSet()) {
+      openUrlModal();
+      return;
+    }
+    // 교사 이름 목록 로드 (오류 무시)
+    loadTeacherNames();
+  };
+
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+  async function doLogin() {
+    var name = document.getElementById('name').value.trim();
+    var pw   = document.getElementById('pw').value.trim();
+    var btn  = document.getElementById('loginBtn');
+    var err  = document.getElementById('err');
+
+    if (!name || !pw) { showErr('이름과 비밀번호를 입력하세요.'); return; }
+    if (!Config.isSet()) { openUrlModal(); return; }
+
+    btn.disabled = true;
+    btn.textContent = '로그인 중...';
+    err.style.display = 'none';
+
+    try {
+      var res = await API.login(name, pw);
+      if (res.success) {
+        Auth.set(res.token, res.teacher);
+        window.location.href = 'app.html';
+      } else {
+        showErr(res.error || '로그인 실패');
+        btn.disabled = false;
+        btn.textContent = '로그인 / Login';
+      }
+    } catch(e) {
+      showErr('서버 오류: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = '로그인 / Login';
+    }
+  }
+
+  function showErr(msg) {
+    var el = document.getElementById('err');
+    el.textContent = msg; el.style.display = 'block';
+  }
+
+  // ── 자동완성 ──
+  var _allNames = [];
+  var _acIdx = -1;
+
+  async function loadTeacherNames() {
+    if (!Config.isSet()) return;
+    try {
+      var res = await API.call('getTeacherNames', {});
+      if (res && res.success) _allNames = res.data;
+    } catch(e) {}
+  }
+
+  function onNameInput(val) {
+    var list = document.getElementById('acList');
+    _acIdx = -1;
+    if (!val.trim()) { list.classList.remove('open'); return; }
+    var filtered = _allNames.filter(n =>
+      n.toLowerCase().includes(val.toLowerCase())
+    );
+    if (!filtered.length) { list.classList.remove('open'); return; }
+    list.innerHTML = filtered.map((n, i) =>
+      `<div class="ac-item" data-name="${n}" onmousedown="selectName('${n}')">${n}</div>`
+    ).join('');
+    list.classList.add('open');
+  }
+
+  function selectName(name) {
+    document.getElementById('name').value = name;
+    document.getElementById('acList').classList.remove('open');
+    document.getElementById('pw').focus();
+  }
+
+  function onNameKey(e) {
+    var list = document.getElementById('acList');
+    var items = list.querySelectorAll('.ac-item');
+    if (!list.classList.contains('open') || !items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _acIdx = Math.min(_acIdx + 1, items.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _acIdx = Math.max(_acIdx - 1, 0);
+    } else if (e.key === 'Enter' && _acIdx >= 0) {
+      e.preventDefault();
+      selectName(items[_acIdx].dataset.name);
+      return;
+    } else if (e.key === 'Escape') {
+      list.classList.remove('open'); return;
+    }
+    items.forEach((el, i) => el.classList.toggle('selected', i === _acIdx));
+  }
+
+  // 외부 클릭 시 닫기
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.ac-wrap'))
+      document.getElementById('acList').classList.remove('open');
+  });
+
+  function openUrlModal() {
+    var cur = Config.get();
+    document.getElementById('curUrl').textContent = cur || '(없음)';
+    document.getElementById('newUrl').value = cur;
+    document.getElementById('urlOverlay').classList.add('open');
+  }
+
+  function closeUrlModal() {
+    document.getElementById('urlOverlay').classList.remove('open');
+  }
+
+  function saveUrl() {
+    var val = document.getElementById('newUrl').value.trim();
+    if (!val.startsWith('https://script.google.com')) {
+      alert('올바른 GAS Web App URL을 입력하세요.'); return;
+    }
+    Config.set(val);
+    closeUrlModal();
+  }
+</script>
+</body>
+</html>

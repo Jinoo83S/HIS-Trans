@@ -18,16 +18,16 @@ var APP = {
 
 // ── 초기화 ──────────────────────────────────────────────────
 window.onload = async function() {
-  if (!Config.isSet()) { window.location.href = 'login.html'; return; }
-  if (!Auth.isLoggedIn()) { window.location.href = 'login.html'; return; }
+  if (!Config.isSet()) { window.location.href = 'index.html'; return; }
+  if (!Auth.isLoggedIn()) { window.location.href = 'index.html'; return; }
 
   try {
     var res = await API.getMe();
-    if (!res) { window.location.href = 'login.html'; return; }
+    if (!res) { window.location.href = 'index.html'; return; }
     if (res.error === 'unauthorized') {
       // 진짜 인증 오류만 clear
       Auth.clear();
-      window.location.href = 'login.html';
+      window.location.href = 'index.html';
       return;
     }
     if (res.success && res.data) {
@@ -37,12 +37,12 @@ window.onload = async function() {
       // 기타 오류 → 캐시 사용
       APP.teacher = Auth.getTeacher();
     }
-    if (!APP.teacher) { window.location.href = 'login.html'; return; }
+    if (!APP.teacher) { window.location.href = 'index.html'; return; }
     initUI();
   } catch(e) {
     // 네트워크 오류 → 캐시된 정보로 진행
     APP.teacher = Auth.getTeacher();
-    if (!APP.teacher) { window.location.href = 'login.html'; return; }
+    if (!APP.teacher) { window.location.href = 'index.html'; return; }
     initUI();
   }
 };
@@ -482,7 +482,7 @@ function saveUrl() {
 function resetUrl() {
   if (!confirm('URL을 초기화하고 로그인 페이지로 이동합니까?')) return;
   Config.clear(); Auth.clear();
-  window.location.href = 'login.html';
+  window.location.href = 'index.html';
 }
 
 // ── 유틸 ────────────────────────────────────────────────────
@@ -536,5 +536,5 @@ function e(s) {
 
 function doLogout() {
   Auth.clear();
-  window.location.href = 'login.html';
+  window.location.href = 'index.html';
 }
