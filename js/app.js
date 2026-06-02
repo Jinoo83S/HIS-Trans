@@ -255,36 +255,21 @@ function renderTable() {
   table.style.display = '';
   empty.style.display = 'none';
 
-  var isTrans = role === '번역';
-
-  var colsInfo = !isTrans
-    ? '<colgroup>' +
-      '<col style="width:6%">' +   // Name EN
-      '<col style="width:5%">' +   // 이름
-      '<col style="width:3%">' +   // Gr.
-      '<col style="width:3%">' +   // Cls.
-      '<col style="width:5%">' +   // NEIS
-      '<col style="width:18%">' +  // Source
-      '<col style="width:3%">' +   // →
-      '<col style="width:18%">' +  // 번역 초본
-      '<col style="width:18%">' +  // 최종본
-      '<col style="width:3%">' +   // 검토
-      '<col style="width:10%">' +  // 검수 코멘트
-      '<col style="width:4%">' +   // 글자수
-      '<col style="width:4%">' +   // 상태
-      '</colgroup>'
-    : '<colgroup>' +
-      '<col style="width:8%">' +   // Name EN
-      '<col style="width:7%">' +   // 이름
-      '<col style="width:4%">' +   // Gr.
-      '<col style="width:4%">' +   // Cls.
-      '<col style="width:7%">' +   // NEIS
-      '<col style="width:28%">' +  // Source
-      '<col style="width:4%">' +   // →
-      '<col style="width:32%">' +  // 번역 초본
-      '<col style="width:6%">' +   // 글자수
-      '<col style="width:6%">' +   // 상태
-      '</colgroup>';
+  var colsInfo = '<colgroup>' +
+    '<col style="width:6%">' +   // Name EN
+    '<col style="width:5%">' +   // 이름
+    '<col style="width:3%">' +   // Gr.
+    '<col style="width:3%">' +   // Cls.
+    '<col style="width:5%">' +   // NEIS
+    '<col style="width:16%">' +  // Source
+    '<col style="width:3%">' +   // 번역
+    '<col style="width:16%">' +  // 번역 초본
+    '<col style="width:16%">' +  // 최종본
+    '<col style="width:3%">' +   // 검토
+    '<col style="width:10%">' +  // 검수 코멘트
+    '<col style="width:4%">' +   // 글자수
+    '<col style="width:5%">' +   // 상태
+    '</colgroup>';
 
   // colgroup을 테이블에 삽입
   var tableEl = document.getElementById('mainTable');
@@ -299,12 +284,12 @@ function renderTable() {
     '<th class="ths">Source (원문)</th>' +
     '<th>번역</th>' +
     '<th class="tht">번역 초본</th>' +
-    (!isTrans ? '<th class="thf">최종본</th>' : '') +
-    (!isTrans ? '<th>검토</th>' : '') +
-    (!isTrans ? '<th>검수 코멘트 <button type="button" onclick="showNeisHelp()" ' +
+    '<th class="thf">최종본</th>' +
+    '<th>검토</th>' +
+    '<th>검수 코멘트 <button type="button" onclick="showNeisHelp()" ' +
       'style="background:var(--teal);color:#fff;border:none;border-radius:50%;' +
       'width:16px;height:16px;font-size:10px;cursor:pointer;font-weight:700;' +
-      'line-height:16px;padding:0;vertical-align:middle">?</button></th>' : '') +
+      'line-height:16px;padding:0;vertical-align:middle">?</button></th>' +
     '<th>글자수</th><th>상태</th>' +
     '</tr>';
 
@@ -316,7 +301,6 @@ function rowHtml(r, i, role) {
   var txt = r.finalText || r.translatedDraft || '';
   var cc = txt.length;
   var ccCls = cc === 0 ? '' : cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
-  var isTrans = role === '번역';
   // 번역초본 vs 최종본 diff 하이라이트 HTML
   var diffHtml = r.finalText && r.translatedDraft
     ? buildDiffHtml(r.translatedDraft, r.finalText) : '';
@@ -328,7 +312,7 @@ function rowHtml(r, i, role) {
     <td><div class="ci">${s.class}</div></td>
     <td><div class="ci ci-neis">${e(s.neis||s.neisClass||'')}</div></td>
     <td><textarea class="cta src" oninput="APP.rows[${i}].sourceText=this.value;markDirty(${i})"
-      ${role==='검수'?'readonly':''}>${e(r.sourceText)}</textarea></td>
+      >${e(r.sourceText)}</textarea></td>
     <td class="ca">
       <button class="btn-arrow" onclick="translateRow(${i})" title="번역"
         ${r.translating?'disabled':''} style="font-size:16px;background:none;border:none;
@@ -346,7 +330,6 @@ function rowHtml(r, i, role) {
         font-size:12px;line-height:1.6;word-break:break-all;background:#f8fafc;
         overflow-y:auto;border:none">${diffHtml}</div>
     </td>
-    ${!isTrans ? `
     <td>
       <textarea class="cta fnl" id="fnl_${i}" oninput="onFinalChange(${i},this.value)">${e(r.finalText)}</textarea>
     </td>
@@ -360,7 +343,6 @@ function rowHtml(r, i, role) {
     <td><div class="cta cmt" id="neis_cmt_${i}"
       style="min-height:76px;padding:7px 9px;font-size:11px;
       color:var(--text2);background:#fafafa;overflow-y:auto;white-space:pre-wrap">${e(r.comment)}</div></td>
-    ` : ''}
     <td><div class="cc ${ccCls}">
       ${cc>0 ? '<span style="font-size:9px;color:var(--gray);display:block">' +
         (document.getElementById('selSem')?.value==='1'?'1학기':'2학기') +
@@ -372,6 +354,10 @@ function rowHtml(r, i, role) {
         style="margin-top:5px;width:100%;
         ${r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : ''}">
         저장
+      </button>
+      <button class="btn-cp" onclick="copyFinal(${i})"
+        style="margin-top:3px;width:100%">
+        복사
       </button>
     </div></td>
   </tr>`;
@@ -1168,6 +1154,13 @@ function savePrompt() {
   toast('프롬프트 저장 완료 ✓', 'success');
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function copyFinal(i) {
+  var txt = APP.rows[i].finalText || APP.rows[i].translatedDraft;
+  if (!txt) { toast('복사할 텍스트가 없습니다.', 'error'); return; }
+  copyToClipboard(txt);
+  toast('최종본 복사 완료 ✓', 'success');
+}
 
 function copyText(i, type) {
   var txt = type === 'final'

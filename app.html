@@ -22,7 +22,6 @@
   <div class="hsep"></div>
   <nav class="hnav">
     <button class="nav-btn active" data-view="translate" onclick="setView(this)">번역 / Translate</button>
-    <button class="nav-btn" data-view="review" onclick="setView(this)" id="navReview">검수 / Review</button>
     <button class="nav-btn" data-view="history" onclick="setView(this)" id="navHistory">이력 / History</button>
     <button class="nav-btn" data-view="admin" onclick="setView(this)" id="navAdmin" style="display:none">관리 / Admin</button>
   </nav>
@@ -99,15 +98,7 @@
   </div>
 
   <!-- 검수 뷰 -->
-  <div id="vReview" style="display:none">
-    <div class="empty-state" id="emptyReview">
-      <div class="eicon">🔍</div><p>검수할 항목이 없습니다.</p>
-    </div>
-    <table class="sheet" id="reviewTable" style="display:none">
-      <thead id="reviewHead"></thead>
-      <tbody id="reviewBody"></tbody>
-    </table>
-  </div>
+
 
   <!-- 관리 뷰 -->
   <div id="vHistory" style="display:none;overflow:auto;padding:16px">
