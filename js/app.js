@@ -100,6 +100,10 @@ function applyDefaultView(view) {
   document.getElementById('vInput').style.display     = view === 'input'     ? '' : 'none';
   document.getElementById('vTranslate').style.display = view === 'translate' ? '' : 'none';
   document.getElementById('vAdmin').style.display     = view === 'admin'     ? '' : 'none';
+  var isAdmin = view === 'admin';
+  document.getElementById('toolbar').style.display = isAdmin ? 'none' : '';
+  document.getElementById('tabs').style.display    = isAdmin ? 'none' : '';
+  if (view === 'admin') renderAdminTab();
 }
 
 // 설정 로드 (엔진/프롬프트/용어/예시)
@@ -107,6 +111,7 @@ function loadSettings(cb) {
   API.getSettings().then(function(res) {
     if (res && res.success) {
       APP.settings = res.data;
+      mergeCustomModels(res.data.customModels);
       // 엔진/모델/creativity 기본값 적용
       var eng = document.getElementById('selEngine');
       var mdl = document.getElementById('selModel');
@@ -658,6 +663,11 @@ function setView(btn) {
   document.getElementById('vInput').style.display     = view === 'input'     ? '' : 'none';
   document.getElementById('vTranslate').style.display = view === 'translate' ? '' : 'none';
   document.getElementById('vAdmin').style.display     = view === 'admin'     ? '' : 'none';
+
+  // 관리 탭에서는 상단 필터바/과목탭 숨김
+  var isAdmin = view === 'admin';
+  document.getElementById('toolbar').style.display = isAdmin ? 'none' : '';
+  document.getElementById('tabs').style.display    = isAdmin ? 'none' : '';
 
   // 뷰 전환 시 현재 선택 과목 다시 렌더
   if (view === 'input' || view === 'translate') {
@@ -1360,13 +1370,69 @@ function onSetEngineChange() {
   }).join('');
 }
 
+function mergeCustomModels(custom) {
+  if (!custom) return;
+  ['claude','gpt','google'].forEach(function(eng) {
+    if (custom[eng] && custom[eng].length) {
+      custom[eng].forEach(function(m) {
+        if (APP.models[eng].indexOf(m) === -1) APP.models[eng].push(m);
+      });
+    }
+  });
+}
+
+// 현재 커스텀 모델만 추출 (기본 모델 제외)
+var BASE_MODELS = {
+  claude: ['claude-opus-4-8','claude-opus-4-6','claude-sonnet-4-6','claude-haiku-4-5-20251001'],
+  gpt:    ['gpt-4o','gpt-4o-mini','gpt-4-turbo','gpt-3.5-turbo'],
+  google: ['google-translate']
+};
+
+function getCustomModels() {
+  var custom = {};
+  ['claude','gpt','google'].forEach(function(eng) {
+    custom[eng] = APP.models[eng].filter(function(m) {
+      return BASE_MODELS[eng].indexOf(m) === -1;
+    });
+  });
+  return custom;
+}
+
+function addCustomModel() {
+  var engine = document.getElementById('setEngine').value;
+  var name = prompt('추가할 ' + engine + ' 모델명을 입력하세요\n(예: claude-opus-4-9, gpt-5)');
+  if (!name) return;
+  name = name.trim();
+  if (!name) return;
+  if (APP.models[engine].indexOf(name) !== -1) { toast('이미 존재하는 모델입니다.', 'error'); return; }
+  APP.models[engine].push(name);
+  onSetEngineChange();
+  document.getElementById('setModel').value = name;
+  toast('모델 추가됨 (저장 필요)', 'success');
+}
+
+function removeCustomModel() {
+  var engine = document.getElementById('setEngine').value;
+  var model  = document.getElementById('setModel').value;
+  if (BASE_MODELS[engine].indexOf(model) !== -1) {
+    toast('기본 모델은 삭제할 수 없습니다.', 'error'); return;
+  }
+  var idx = APP.models[engine].indexOf(model);
+  if (idx !== -1) {
+    APP.models[engine].splice(idx, 1);
+    onSetEngineChange();
+    toast('모델 삭제됨 (저장 필요)', 'success');
+  }
+}
+
 async function saveSettingsModal() {
   var data = {
     engine:       document.getElementById('setEngine').value,
     model:        document.getElementById('setModel').value,
     creativity:   document.getElementById('setCreat').value,
     step1_prompt: document.getElementById('setStep1').value,
-    step2_prompt: document.getElementById('setStep2').value
+    step2_prompt: document.getElementById('setStep2').value,
+    customModels: getCustomModels()
   };
   try {
     var res = await API.saveSettings(data);

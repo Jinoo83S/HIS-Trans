@@ -137,7 +137,14 @@
         <select class="finput" id="setEngine" onchange="onSetEngineChange()">
           <option value="claude">Claude</option><option value="gpt">GPT</option>
           <option value="google">Google</option></select></div>
-      <div style="flex:1;min-width:160px"><div class="flabel">모델</div>
+      <div style="flex:1;min-width:200px"><div class="flabel">모델
+        <button type="button" onclick="addCustomModel()" title="모델 추가"
+          style="margin-left:6px;background:var(--teal);color:#fff;border:none;border-radius:4px;
+          width:18px;height:18px;font-size:12px;cursor:pointer;line-height:1;padding:0">+</button>
+        <button type="button" onclick="removeCustomModel()" title="선택 모델 삭제"
+          style="margin-left:2px;background:var(--red);color:#fff;border:none;border-radius:4px;
+          width:18px;height:18px;font-size:12px;cursor:pointer;line-height:1;padding:0">−</button>
+        </div>
         <select class="finput" id="setModel"></select></div>
       <div style="flex:0 0 100px"><div class="flabel">Creativity</div>
         <input class="finput" id="setCreat" type="number" step="0.1" min="0" max="1" value="0.3"></div>
