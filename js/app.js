@@ -101,9 +101,22 @@ function applyDefaultView(view) {
   document.getElementById('vTranslate').style.display = view === 'translate' ? '' : 'none';
   document.getElementById('vAdmin').style.display     = view === 'admin'     ? '' : 'none';
   var isAdmin = view === 'admin';
-  document.getElementById('toolbar').style.display = isAdmin ? 'none' : '';
-  document.getElementById('tabs').style.display    = isAdmin ? 'none' : '';
+  toggleToolbarMode(isAdmin);
+  document.getElementById('tabs').style.display = isAdmin ? 'none' : '';
   if (view === 'admin') renderAdminTab();
+}
+
+// 관리 탭: 번역 전용 컨트롤 숨김, 엔진 컨트롤만 표시
+function toggleToolbarMode(isAdminView) {
+  document.querySelectorAll('.trans-only').forEach(function(el) {
+    el.style.display = isAdminView ? 'none' : '';
+  });
+  // 관리자는 관리 탭에서 엔진 컨트롤 편집 가능, 그 외엔 읽기전용
+  var canEdit = APP.teacher.role === '관리자';
+  ['selEngine','selModel','slCreat'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.disabled = !canEdit;
+  });
 }
 
 // 설정 로드 (엔진/프롬프트/용어/예시)
@@ -655,6 +668,27 @@ function onEngineChange() {
   if (creatCtrl) creatCtrl.style.display = isGoogle ? 'none' : '';
 }
 
+// 관리자가 상단바에서 엔진/모델/creativity 변경 시 설정 자동 저장
+async function saveEngineSettingFromToolbar() {
+  if (APP.teacher.role !== '관리자') return;
+  var data = {
+    engine:     document.getElementById('selEngine').value,
+    model:      document.getElementById('selModel').value,
+    creativity: document.getElementById('slCreat').value
+  };
+  try {
+    var res = await API.saveSettings(data);
+    if (res.success) {
+      if (APP.settings) {
+        APP.settings.engine = data.engine;
+        APP.settings.model = data.model;
+        APP.settings.creativity = data.creativity;
+      }
+      toast('엔진 설정 저장됨 ✓', 'success');
+    }
+  } catch(e) {}
+}
+
 function setView(btn) {
   var view = btn.dataset.view;
   APP.currentView = view;
@@ -664,10 +698,10 @@ function setView(btn) {
   document.getElementById('vTranslate').style.display = view === 'translate' ? '' : 'none';
   document.getElementById('vAdmin').style.display     = view === 'admin'     ? '' : 'none';
 
-  // 관리 탭에서는 상단 필터바/과목탭 숨김
+  // 관리 탭: toolbar는 유지하되 번역 전용 컨트롤(.trans-only)만 숨김, 엔진 설정은 표시
   var isAdmin = view === 'admin';
-  document.getElementById('toolbar').style.display = isAdmin ? 'none' : '';
-  document.getElementById('tabs').style.display    = isAdmin ? 'none' : '';
+  toggleToolbarMode(isAdmin);
+  document.getElementById('tabs').style.display = isAdmin ? 'none' : '';
 
   // 뷰 전환 시 현재 선택 과목 다시 렌더
   if (view === 'input' || view === 'translate') {

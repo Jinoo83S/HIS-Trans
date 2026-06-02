@@ -36,45 +36,46 @@
 <!-- 툴바 -->
 <div id="toolbar">
   <div class="tb-row">
-    <div class="ctrl-g"><span class="clabel">Year</span>
+    <div class="ctrl-g trans-only"><span class="clabel">Year</span>
       <select id="selYear" onchange="onFilterChange()"></select></div>
-    <div class="ctrl-g"><span class="clabel">Sem.</span>
+    <div class="ctrl-g trans-only"><span class="clabel">Sem.</span>
       <select id="selSem" onchange="onFilterChange()">
         <option value="1">1학기</option><option value="2">2학기</option>
       </select></div>
-    <div class="ctrl-g"><span class="clabel">Grade</span>
+    <div class="ctrl-g trans-only"><span class="clabel">Grade</span>
       <select id="selGrade" onchange="onFilterChange()">
         <option value="">전체</option>
         <option>7</option><option>8</option><option>9</option>
         <option>10</option><option>11</option><option>12</option>
       </select></div>
-    <div class="ctrl-g">
+    <div class="ctrl-g trans-only">
       <select id="selSubject" class="sel-subject" onchange="onSubjectChange()">
         <option value="">-- 과목/동아리 선택 --</option>
       </select></div>
-    <div class="hsep"></div>
-    <div class="ctrl-g"><span class="clabel">Source</span>
+    <div class="hsep trans-only"></div>
+    <div class="ctrl-g trans-only"><span class="clabel">Source</span>
       <select id="selSrc"><option value="English">English</option><option value="Korean">Korean</option></select></div>
-    <div class="ctrl-g"><span class="clabel">→ Target</span>
+    <div class="ctrl-g trans-only"><span class="clabel">→ Target</span>
       <select id="selTgt"><option value="Korean">Korean</option><option value="English">English</option></select></div>
-    <div class="ctrl-g"><span class="clabel">Engine</span>
-      <select id="selEngine" onchange="onEngineChange()">
+    <div class="ctrl-g engine-ctrl"><span class="clabel">Engine</span>
+      <select id="selEngine" onchange="onEngineChange();saveEngineSettingFromToolbar()">
         <option value="google">Google (무료)</option>
         <option value="gpt">GPT</option>
         <option value="claude">Claude</option>
       </select></div>
-    <div class="ctrl-g"><span class="clabel">Model</span>
-      <select id="selModel"></select></div>
-    <div class="ctrl-g creat-wrap">
+    <div class="ctrl-g engine-ctrl"><span class="clabel">Model</span>
+      <select id="selModel" onchange="saveEngineSettingFromToolbar()"></select></div>
+    <div class="ctrl-g creat-wrap engine-ctrl">
       <span class="clabel">Creativity</span>
       <input type="range" id="slCreat" min="0.1" max="0.9" step="0.1" value="0.5"
-        oninput="document.getElementById('vCreat').textContent=this.value">
+        oninput="document.getElementById('vCreat').textContent=this.value"
+        onchange="saveEngineSettingFromToolbar()">
       <span class="creat-val" id="vCreat">0.5</span></div>
-    <button class="btn-icon" onclick="openPromptModal()">✏️ 프롬프트</button>
-    <button class="btn-teal" onclick="pipelineAll()">▶ 전체 번역</button>
-    <button class="btn-icon" onclick="loadInitialData(true)" title="데이터 새로고침" style="flex-shrink:0">🔄</button>
-    <button class="btn-icon" onclick="saveAll()" style="border-color:#16a34a;color:#16a34a" id="btnSaveAll">💾 일괄 저장</button>
-    <button class="btn-icon" onclick="downloadExcel()" style="border-color:#0369a1;color:#0369a1;flex-shrink:0" title="NEIS 엑셀 다운로드">📥 엑셀</button>
+    <button class="btn-icon trans-only" onclick="openPromptModal()">✏️ 프롬프트</button>
+    <button class="btn-teal trans-only" onclick="pipelineAll()">▶ 전체 번역</button>
+    <button class="btn-icon trans-only" onclick="loadInitialData(true)" title="데이터 새로고침" style="flex-shrink:0">🔄</button>
+    <button class="btn-icon trans-only" onclick="saveAll()" style="border-color:#16a34a;color:#16a34a" id="btnSaveAll">💾 일괄 저장</button>
+    <button class="btn-icon trans-only" onclick="downloadExcel()" style="border-color:#0369a1;color:#0369a1;flex-shrink:0" title="NEIS 엑셀 다운로드">📥 엑셀</button>
   </div>
 </div>
 
