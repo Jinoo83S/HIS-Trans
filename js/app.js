@@ -14,6 +14,13 @@ var APP = {
     gpt:    ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
     claude: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
     google: ['google-translate']
+  },
+  // 캐시
+  cache: {
+    loaded:    false,
+    courseMap: {},   // subjectCode → [students]
+    clubMap:   {},   // clubName   → [students]
+    transMap:  {}    // subjectCode|studentName → trans record
   }
 };
 
@@ -67,29 +74,41 @@ function initUI() {
   document.getElementById('selSem').value = (now.getMonth() + 1) <= 7 ? '1' : '2';
 
   onEngineChange();
-  loadSubjects();
+  loadInitialData();
   hideLoading();
 }
 
 // ── 과목 목록 ────────────────────────────────────────────────
 async function loadSubjects() {
-  var sem = document.getElementById('selSem').value;
-  var role = APP.teacher && APP.teacher.role;
-  try {
-    var res;
-    if (role === '관리자') {
-      res = await API.getAllSubjects(sem);
-    } else if (role === '검수') {
-      // 담당 번역교사의 과목만
-      res = await API.getReviewerSubjects(sem);
-    } else {
-      // 번역 교사: 본인 과목만
-      res = await API.getMySubjects(sem);
-    }
-    if (!res.success) { toast('과목 로드 실패', 'error'); return; }
-    APP.subjects = res.data;
+  await loadInitialData();
+}
+
+async function loadInitialData(force) {
+  var year = document.getElementById('selYear').value;
+  var sem  = document.getElementById('selSem').value;
+
+  // 이미 로드됐고 강제 갱신 아니면 스킵
+  if (APP.cache.loaded && !force) {
     renderSubjectSelect();
-  } catch(e) { toast('오류: ' + e.message, 'error'); }
+    return;
+  }
+
+  showLoading('데이터 불러오는 중...');
+  try {
+    var res = await API.getInitialData(year, sem);
+    hideLoading();
+    if (!res.success) { toast('로드 실패: ' + res.error, 'error'); return; }
+
+    // 캐시 저장
+    APP.subjects        = res.subjects  || [];
+    APP.cache.courseMap = res.courseMap || {};
+    APP.cache.clubMap   = res.clubMap   || {};
+    APP.cache.transMap  = res.transMap  || {};
+    APP.cache.loaded    = true;
+
+    renderSubjectSelect();
+    toast('데이터 로드 완료 ✓', 'success');
+  } catch(e) { hideLoading(); toast('오류: ' + e.message, 'error'); }
 }
 
 function renderSubjectSelect() {
@@ -155,57 +174,66 @@ async function onSubjectChange() {
   if (!opt || !opt.dataset.s) { APP.selectedSubject = null; showEmptyTrans(); return; }
 
   APP.selectedSubject = JSON.parse(opt.dataset.s);
-  showLoading('불러오는 중...');
+  var isClub      = APP.currentTab === '동아리';
+  var subjectCode = APP.selectedSubject.subjectCode;
 
-  try {
-    var isClub = APP.currentTab === '동아리';
-    var subjectCode = APP.selectedSubject.subjectCode;
-    var filters = {
-      year:        document.getElementById('selYear').value,
-      semester:    document.getElementById('selSem').value,
-      subjectCode: subjectCode
-    };
+  // 캐시에서 즉시 로드
+  var students = isClub
+    ? (APP.cache.clubMap[subjectCode]   || [])
+    : (APP.cache.courseMap[subjectCode] || []);
 
-    // 학생 목록 + 저장된 번역 데이터 병렬 로드
-    var [studentsRes, transRes] = await Promise.all([
-      API.getStudentsByCourse(subjectCode, isClub),
-      API.getTransList(filters)
-    ]);
-
-    hideLoading();
-    if (!studentsRes.success) { toast('학생 로드 실패', 'error'); return; }
-
-    // 저장된 번역 데이터를 학생 이름 기준으로 맵핑
-    // 같은 학생의 여러 레코드 중 가장 최신(rowIndex 큰) 것 사용
-    var transMap = {};
-    if (transRes && transRes.data) {
-      transRes.data.forEach(function(t) {
-        var key = t.studentName;
-        if (!transMap[key] || t.rowIndex > transMap[key].rowIndex) {
-          transMap[key] = t;
-        }
+  if (!students.length && !APP.cache.loaded) {
+    // 캐시 미준비 시 fallback: API 직접 호출
+    showLoading('불러오는 중...');
+    try {
+      var [sRes, tRes] = await Promise.all([
+        API.getStudentsByCourse(subjectCode, isClub),
+        API.getTransList({ year: document.getElementById('selYear').value,
+                          semester: document.getElementById('selSem').value,
+                          subjectCode: subjectCode })
+      ]);
+      hideLoading();
+      if (!sRes.success) { toast('학생 로드 실패', 'error'); return; }
+      students = sRes.data;
+      var fm = {};
+      (tRes.data || []).forEach(function(t) {
+        if (!fm[t.studentName] || t.rowIndex > fm[t.studentName].rowIndex) fm[t.studentName] = t;
       });
-    }
+      APP.rows = students.map(function(s) {
+        var saved = fm[s.name] || {};
+        return { student: s, sourceText: saved.sourceText||'',
+          translatedDraft: saved.translatedDraft||'',
+          finalText: saved.finalText||saved.reviewedText||'',
+          comment: saved.reviewerComment||'', status: saved.status||'draft',
+          rowIndex: saved.rowIndex||null, translating: false, _dirty: false };
+      });
+      renderTable(); return;
+    } catch(err) { hideLoading(); toast(err.message, 'error'); return; }
+  }
 
-    APP.rows = studentsRes.data.map(function(s) {
-      var saved = transMap[s.name] || {};
-      return {
-        student:        s,
-        sourceText:     saved.sourceText     || '',
-        translatedDraft:saved.translatedDraft|| '',
-        finalText:      saved.finalText      || saved.reviewedText || '',
-        comment:        saved.reviewerComment|| '',
-        status:         saved.status         || 'draft',
-        rowIndex:       saved.rowIndex       || null,
-        translating:    false
-      };
-    });
-
-    renderTable();
-  } catch(err) { hideLoading(); toast(err.message, 'error'); }
+  // 캐시 데이터로 즉시 렌더링
+  APP.rows = students.map(function(s) {
+    var key   = subjectCode + '|' + s.name;
+    var saved = APP.cache.transMap[key] || {};
+    return {
+      student:         s,
+      sourceText:      saved.sourceText      || '',
+      translatedDraft: saved.translatedDraft || '',
+      finalText:       saved.finalText       || saved.reviewedText || '',
+      comment:         saved.reviewerComment || '',
+      status:          saved.status          || 'draft',
+      rowIndex:        saved.rowIndex        || null,
+      translating:     false,
+      _dirty:          false
+    };
+  });
+  renderTable();
 }
 
-function onFilterChange() { loadSubjects(); }
+function onFilterChange() {
+  APP.cache.loaded = false; // 년도/학기 변경 시 캐시 무효화
+  loadSubjects();
+}
 
 // ── 테이블 렌더링 ────────────────────────────────────────────
 function renderTable() {
@@ -538,6 +566,18 @@ async function saveRow(i) {
     if (res && res.success) {
       row.status = row.finalText ? 'reviewed' : 'draft';
       row._dirty = false;
+      // 캐시 갱신
+      if (APP.selectedSubject) {
+        var cacheKey = APP.selectedSubject.subjectCode + '|' + row.student.name;
+        APP.cache.transMap[cacheKey] = {
+          rowIndex:        row.rowIndex,
+          sourceText:      row.sourceText,
+          translatedDraft: row.translatedDraft,
+          finalText:       row.finalText,
+          reviewerComment: row.comment,
+          status:          row.status
+        };
+      }
       refreshRow(i);
       toast('저장 완료 ✓', 'success');
     } else {
