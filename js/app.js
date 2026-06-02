@@ -1196,6 +1196,8 @@ function renderHistoryTable(data) {
 var _teacherData = [];
 
 async function loadTeacherList() {
+  var cl = document.getElementById('curriculumList');
+  if (cl) cl.innerHTML = '';
   try {
     var res = await API.getTeachers();
     if (!res.success) { toast('로드 실패', 'error'); return; }
@@ -1363,6 +1365,65 @@ async function changeRole(name) {
 
 function renderAdminTab() {
   loadTeacherList();
+}
+
+// ── 관리자: 과목/동아리 편집 ──────────────────────────────────
+var _currData = [];
+
+async function loadCurriculumList() {
+  document.getElementById('teacherList').innerHTML = '';
+  var wrap = document.getElementById('curriculumList');
+  wrap.innerHTML = '<p style="color:var(--gray);padding:10px">불러오는 중...</p>';
+  try {
+    var res = await API.getCurriculumAll();
+    if (!res.success) { toast('로드 실패: ' + res.error, 'error'); return; }
+    _currData = res.data;
+    renderCurriculumTable();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function renderCurriculumTable() {
+  var wrap = document.getElementById('curriculumList');
+  var html = '<div class="admin-section"><h4>📖 과목 · 동아리 편집</h4>' +
+    '<p style="font-size:11px;color:var(--gray);margin-bottom:10px">담당교사는 쉼표(,)로 구분. 학기1=Q~S, 학기2=T~V 열에 저장됩니다.</p>' +
+    '<table class="sheet" style="min-width:100%"><thead><tr>' +
+    '<th style="width:5%">학년</th><th style="width:7%">구분</th>' +
+    '<th style="width:16%">과목명(KR)</th><th style="width:16%">과목명(EN)</th>' +
+    '<th style="width:8%">언어</th>' +
+    '<th style="width:18%">담당교사 1학기</th><th style="width:18%">담당교사 2학기</th>' +
+    '<th style="width:8%">변경</th></tr></thead><tbody>' +
+    _currData.map(function(c, i) {
+      return '<tr id="crow_' + i + '">' +
+        '<td><div class="ci">' + c.grade + '</div></td>' +
+        '<td><div class="ci" style="font-size:11px">' + e(c.type) + '</div></td>' +
+        '<td><input class="cedit" id="c_kr_' + i + '" value="' + e(c.nameKR) + '"></td>' +
+        '<td><input class="cedit" id="c_en_' + i + '" value="' + e(c.nameEN) + '"></td>' +
+        '<td><input class="cedit" id="c_lang_' + i + '" value="' + e(c.language) + '"></td>' +
+        '<td><input class="cedit" id="c_t1_' + i + '" value="' + e(c.teachers1) + '"></td>' +
+        '<td><input class="cedit" id="c_t2_' + i + '" value="' + e(c.teachers2) + '"></td>' +
+        '<td class="ca"><button class="btn-tr" onclick="saveCurriculum(' + i + ')">저장</button></td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table></div>';
+  wrap.innerHTML = html;
+}
+
+async function saveCurriculum(i) {
+  var c = _currData[i];
+  var fields = {
+    nameKR:    document.getElementById('c_kr_' + i).value.trim(),
+    nameEN:    document.getElementById('c_en_' + i).value.trim(),
+    language:  document.getElementById('c_lang_' + i).value.trim(),
+    teachers1: document.getElementById('c_t1_' + i).value.trim(),
+    teachers2: document.getElementById('c_t2_' + i).value.trim()
+  };
+  try {
+    var res = await API.updateCurriculum(c.rowIndex, fields);
+    if (res.success) {
+      toast(c.nameKR + ' 저장 완료 ✓', 'success');
+      APP.cache.loaded = false; // 과목 변경 → 캐시 무효화
+    } else toast('저장 실패: ' + res.error, 'error');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ── 엔진·프롬프트 설정 모달 ──────────────────────────────────

@@ -152,13 +152,17 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12p
 .loading-text { color: var(--gray); font-size: 13px; }
 
 /* ── 토스트 ── */
-#toast { position: fixed; bottom: 20px; right: 20px; background: var(--bg2);
-  border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px;
-  font-size: 12px; color: var(--text); z-index: 9999; opacity: 0;
-  transition: opacity 0.3s; max-width: 280px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-#toast.show { opacity: 1; }
-#toast.success { border-color: var(--teal); color: var(--teal); }
-#toast.error   { border-color: var(--red); color: var(--red); }
+#toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%) translateY(-12px);
+  background: var(--bg2); border: 2px solid var(--border); border-radius: 12px;
+  padding: 16px 28px; font-size: 15px; font-weight: 600; color: var(--text);
+  z-index: 9999; opacity: 0; pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s; max-width: 420px; text-align: center;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.18); }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.success { border-color: var(--teal); color: var(--teal);
+  background: #f0fdfa; }
+#toast.error   { border-color: var(--red); color: var(--red);
+  background: #fef2f2; }
 
 /* ── 모달 ── */
 .overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.4); z-index: 500;
@@ -203,3 +207,9 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12p
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* 관리자 과목 편집 인풋 */
+.cedit { width: 100%; border: 1px solid var(--border); border-radius: 4px;
+  padding: 5px 7px; font-size: 12px; font-family: 'Noto Sans KR', sans-serif;
+  background: var(--bg); color: var(--text); }
+.cedit:focus { outline: none; border-color: var(--teal); }
