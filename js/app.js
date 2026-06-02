@@ -12,7 +12,7 @@ var APP = {
   prompt: '',
   models: {
     gpt:    ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-    claude: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
+    claude: ['claude-opus-4-8', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
     google: ['google-translate']
   },
   // 캐시
@@ -1235,9 +1235,11 @@ function renderTeacherTable() {
         <td><div class="ci" id="assignWrap_${nameKey}" style="min-width:160px">
           ${isReviewer ? buildAssignDropdown(nameKey, translators, t.assignedTo||'') : '<span style="color:var(--gray);font-size:11px">-</span>'}
         </div></td>
-        <td class="ca">
-          <button class="btn-tr" onclick="saveTeacher('${nameKey}','${t.name}')">저장</button>
-        </td>
+        <td class="ca"><div style="display:flex;gap:4px">
+          <button class="btn-tr" onclick="saveTeacher('${nameKey}','${t.name}')" style="flex:1">저장</button>
+          <button class="btn-cp" onclick="deleteTeacherRow('${t.name}')"
+            style="flex:1;background:#fee2e2;border-color:#fca5a5;color:var(--red)">삭제</button>
+        </div></td>
       </tr>`;
     }).join('') +
     '</tbody></table></div>' +
@@ -1279,6 +1281,15 @@ async function saveTeacher(nameKey, name) {
     if (res.success) { toast(name + ' 저장 완료 ✓', 'success'); loadTeacherList(); }
     else toast('저장 실패', 'error');
   } catch(err) { toast(err.message, 'error'); }
+}
+
+async function deleteTeacherRow(name) {
+  if (!confirm('[' + name + '] 교사를 삭제하시겠습니까?')) return;
+  try {
+    var res = await API.deleteTeacher(name);
+    if (res.success) { toast(name + ' 삭제 완료 ✓', 'success'); loadTeacherList(); }
+    else toast('삭제 실패: ' + res.error, 'error');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 async function addTeacher() {
@@ -1401,11 +1412,11 @@ function renderCurriculumTable() {
         '<td><input class="cedit" id="c_lang_' + i + '" value="' + e(c.language) + '"></td>' +
         '<td><input class="cedit" id="c_t1_' + i + '" value="' + e(c.teachers1) + '"></td>' +
         '<td><input class="cedit" id="c_t2_' + i + '" value="' + e(c.teachers2) + '"></td>' +
-        '<td class="ca">' +
-          '<button class="btn-tr" onclick="saveCurriculum(' + i + ')">저장</button>' +
+        '<td class="ca"><div style="display:flex;gap:4px">' +
+          '<button class="btn-tr" onclick="saveCurriculum(' + i + ')" style="flex:1">저장</button>' +
           '<button class="btn-cp" onclick="deleteCurriculumRow(' + i + ')" ' +
-            'style="margin-top:3px;background:#fee2e2;border-color:#fca5a5;color:var(--red)">삭제</button>' +
-        '</td>' +
+            'style="flex:1;background:#fee2e2;border-color:#fca5a5;color:var(--red)">삭제</button>' +
+        '</div></td>' +
       '</tr>';
     }).join('') +
     '</tbody></table>' +
@@ -1593,12 +1604,14 @@ async function persistCustomModels() {
 // 상단바(번역 탭) 모델 드롭다운 갱신
 function refreshToolbarModels() {
   var topEngine = document.getElementById('selEngine');
-  if (!topEngine) return;
-  var cur = document.getElementById('selModel').value;
-  onEngineChange();
-  // 기존 선택 유지 시도
-  var sel = document.getElementById('selModel');
-  if (cur && APP.models[topEngine.value].indexOf(cur) !== -1) sel.value = cur;
+  var topModel  = document.getElementById('selModel');
+  if (!topEngine || !topModel) return;
+  var cur = topModel.value;
+  // 상단바 엔진의 현재 모델 목록 다시 채움
+  topModel.innerHTML = (APP.models[topEngine.value] || []).map(function(m) {
+    return '<option value="' + m + '">' + m + '</option>';
+  }).join('');
+  if (cur && APP.models[topEngine.value].indexOf(cur) !== -1) topModel.value = cur;
 }
 
 async function saveSettingsModal() {
