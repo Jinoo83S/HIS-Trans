@@ -1432,7 +1432,7 @@ function getCustomModels() {
   return custom;
 }
 
-function addCustomModel() {
+async function addCustomModel() {
   var engine = document.getElementById('setEngine').value;
   var name = prompt('추가할 ' + engine + ' 모델명을 입력하세요\n(예: claude-opus-4-9, gpt-5)');
   if (!name) return;
@@ -1442,10 +1442,13 @@ function addCustomModel() {
   APP.models[engine].push(name);
   onSetEngineChange();
   document.getElementById('setModel').value = name;
-  toast('모델 추가됨 (저장 필요)', 'success');
+  // 즉시 저장 + 상단바 드롭다운 갱신
+  await persistCustomModels();
+  refreshToolbarModels();
+  toast('모델 추가·저장됨 ✓', 'success');
 }
 
-function removeCustomModel() {
+async function removeCustomModel() {
   var engine = document.getElementById('setEngine').value;
   var model  = document.getElementById('setModel').value;
   if (BASE_MODELS[engine].indexOf(model) !== -1) {
@@ -1455,8 +1458,29 @@ function removeCustomModel() {
   if (idx !== -1) {
     APP.models[engine].splice(idx, 1);
     onSetEngineChange();
-    toast('모델 삭제됨 (저장 필요)', 'success');
+    await persistCustomModels();
+    refreshToolbarModels();
+    toast('모델 삭제·저장됨 ✓', 'success');
   }
+}
+
+// 커스텀 모델만 시트에 저장
+async function persistCustomModels() {
+  try {
+    await API.saveSettings({ customModels: getCustomModels() });
+    if (APP.settings) APP.settings.customModels = getCustomModels();
+  } catch(e) { toast('모델 저장 실패: ' + e.message, 'error'); }
+}
+
+// 상단바(번역 탭) 모델 드롭다운 갱신
+function refreshToolbarModels() {
+  var topEngine = document.getElementById('selEngine');
+  if (!topEngine) return;
+  var cur = document.getElementById('selModel').value;
+  onEngineChange();
+  // 기존 선택 유지 시도
+  var sel = document.getElementById('selModel');
+  if (cur && APP.models[topEngine.value].indexOf(cur) !== -1) sel.value = cur;
 }
 
 async function saveSettingsModal() {
