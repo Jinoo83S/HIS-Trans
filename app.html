@@ -146,9 +146,13 @@
       <textarea class="finput ftarea" id="setStep1" rows="6"></textarea></div>
     <div class="frow"><div class="flabel">STEP 2 프롬프트 (세특 윤문)</div>
       <textarea class="finput ftarea" id="setStep2" rows="8"></textarea></div>
-    <div class="mfooter">
-      <button class="btn-cancel" onclick="closeModal('settingsOverlay')">취소</button>
-      <button class="btn-save" onclick="saveSettingsModal()">저장</button>
+    <div class="mfooter" style="justify-content:space-between">
+      <button class="btn-cancel" onclick="resetSettingsDefault()"
+        style="border-color:#f59e0b;color:#d97706">↺ 기본값 복원</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-cancel" onclick="closeModal('settingsOverlay')">취소</button>
+        <button class="btn-save" onclick="saveSettingsModal()">저장</button>
+      </div>
     </div>
   </div>
 </div>

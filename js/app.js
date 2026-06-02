@@ -1322,7 +1322,12 @@ function renderAdminTab() {
 }
 
 // ── 엔진·프롬프트 설정 모달 ──────────────────────────────────
-function openSettingsModal() {
+async function openSettingsModal() {
+  // 항상 최신 설정 로드
+  try {
+    var res = await API.getSettings();
+    if (res && res.success) APP.settings = res.data;
+  } catch(e) {}
   var s = APP.settings || {};
   document.getElementById('setEngine').value = s.engine || 'claude';
   onSetEngineChange();
@@ -1331,6 +1336,20 @@ function openSettingsModal() {
   document.getElementById('setStep1').value  = s.step1_prompt || '';
   document.getElementById('setStep2').value  = s.step2_prompt || '';
   document.getElementById('settingsOverlay').classList.add('open');
+}
+
+async function resetSettingsDefault() {
+  if (!confirm('엔진·프롬프트·용어·예시를 모두 기본값으로 되돌립니다. 계속하시겠습니까?')) return;
+  try {
+    var res = await API.resetSettings();
+    if (res.success) {
+      toast('기본값 복원 완료 ✓', 'success');
+      var s = await API.getSettings();
+      if (s.success) APP.settings = s.data;
+      closeModal('settingsOverlay');
+      openSettingsModal();
+    } else toast('복원 실패: ' + res.error, 'error');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 function onSetEngineChange() {
@@ -1360,7 +1379,11 @@ async function saveSettingsModal() {
 }
 
 // ── 용어·예시 모달 ──────────────────────────────────────────
-function openRefModal() {
+async function openRefModal() {
+  try {
+    var res = await API.getSettings();
+    if (res && res.success) APP.settings = res.data;
+  } catch(e) {}
   var s = APP.settings || {};
   document.getElementById('setTerms').value = s.terms || '';
   document.getElementById('setExamples').value = (s.examples || []).join('\n\n');
