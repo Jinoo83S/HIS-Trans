@@ -179,7 +179,11 @@ async function onSubjectChange() {
   var isClub      = APP.currentTab === '동아리';
   var subjectCode = APP.selectedSubject.subjectCode;
 
-  // 캐시에서 즉시 로드
+  // 이력/검수 탭에서는 번역 렌더 스킵, 해당 뷰만 갱신
+  if (APP.currentView === 'history') { loadHistoryList(); return; }
+  if (APP.currentView === 'review')  { loadReviewList();  return; }
+
+  // 번역 탭: 캐시에서 즉시 로드
   var students = isClub
     ? (APP.cache.clubMap[subjectCode]   || [])
     : (APP.cache.courseMap[subjectCode] || []);
@@ -230,10 +234,6 @@ async function onSubjectChange() {
     };
   });
   renderTable();
-
-  // 검수/이력 탭이 열려있으면 즉시 갱신
-  if (APP.currentView === 'review')  loadReviewList();
-  if (APP.currentView === 'history') loadHistoryList();
 }
 
 function onFilterChange() {
@@ -381,11 +381,11 @@ function showEmptyTrans() {
 // ── 이벤트 ──────────────────────────────────────────────────
 function markDirty(i) {
   if (APP.rows[i]) { APP.rows[i]._dirty = true; }
-  // 상태 셀만 빠르게 갱신
   var td = document.querySelector('#row_' + i + ' td:last-child .ci');
   if (td) td.innerHTML = buildStatusBadge(APP.rows[i]) +
     '<button class="btn-cp" onclick="saveRow(' + i + ')" ' +
-    'style="margin-top:5px;width:100%;background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700">저장</button>';
+    'style="margin-top:5px;width:100%;background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700">저장</button>' +
+    '<button class="btn-cp" onclick="copyFinal(' + i + ')" style="margin-top:3px;width:100%">복사</button>';
 }
 
 function onDraftChange(i, val) {
@@ -640,6 +640,7 @@ async function runNeisCheck(i) {
     }
     APP.rows[i].comment = msg;
     if (cmtEl) cmtEl.textContent = msg;
+    markDirty(i); // 검토 결과 저장 활성화
   } catch(err) {
     if (cmtEl) cmtEl.textContent = '검토 오류: ' + err.message;
   }
