@@ -64,6 +64,8 @@ var API = (function() {
     resetSettings:      ()                      => call('resetSettings'),
     getCurriculumAll:   ()                      => call('getCurriculumAll'),
     updateCurriculum:   (rowIndex, fields)      => call('updateCurriculum', { rowIndex, fields }),
+    addCurriculum:      (fields)                => call('addCurriculum', { fields }),
+    deleteCurriculum:   (rowIndex)              => call('deleteCurriculum', { rowIndex }),
 
     // 저장/조회
     saveTrans:          (record)                => call('saveTrans', { record }),

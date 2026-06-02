@@ -1388,10 +1388,10 @@ function renderCurriculumTable() {
     '<p style="font-size:11px;color:var(--gray);margin-bottom:10px">담당교사는 쉼표(,)로 구분. 학기1=Q~S, 학기2=T~V 열에 저장됩니다.</p>' +
     '<table class="sheet" style="min-width:100%"><thead><tr>' +
     '<th style="width:5%">학년</th><th style="width:7%">구분</th>' +
-    '<th style="width:16%">과목명(KR)</th><th style="width:16%">과목명(EN)</th>' +
-    '<th style="width:8%">언어</th>' +
-    '<th style="width:18%">담당교사 1학기</th><th style="width:18%">담당교사 2학기</th>' +
-    '<th style="width:8%">변경</th></tr></thead><tbody>' +
+    '<th style="width:15%">과목명(KR)</th><th style="width:15%">과목명(EN)</th>' +
+    '<th style="width:7%">언어</th>' +
+    '<th style="width:17%">담당교사 1학기</th><th style="width:17%">담당교사 2학기</th>' +
+    '<th style="width:12%">변경</th></tr></thead><tbody>' +
     _currData.map(function(c, i) {
       return '<tr id="crow_' + i + '">' +
         '<td><div class="ci">' + c.grade + '</div></td>' +
@@ -1401,11 +1401,65 @@ function renderCurriculumTable() {
         '<td><input class="cedit" id="c_lang_' + i + '" value="' + e(c.language) + '"></td>' +
         '<td><input class="cedit" id="c_t1_' + i + '" value="' + e(c.teachers1) + '"></td>' +
         '<td><input class="cedit" id="c_t2_' + i + '" value="' + e(c.teachers2) + '"></td>' +
-        '<td class="ca"><button class="btn-tr" onclick="saveCurriculum(' + i + ')">저장</button></td>' +
+        '<td class="ca">' +
+          '<button class="btn-tr" onclick="saveCurriculum(' + i + ')">저장</button>' +
+          '<button class="btn-cp" onclick="deleteCurriculumRow(' + i + ')" ' +
+            'style="margin-top:3px;background:#fee2e2;border-color:#fca5a5;color:var(--red)">삭제</button>' +
+        '</td>' +
       '</tr>';
     }).join('') +
-    '</tbody></table></div>';
+    '</tbody></table>' +
+
+    // 신규 추가 폼
+    '<div style="margin-top:16px;padding:14px;background:var(--bg3);border-radius:8px">' +
+    '<div style="font-size:13px;font-weight:600;margin-bottom:10px">➕ 새 과목/동아리 추가</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">' +
+    '<div><div class="flabel">학년</div><input class="finput" id="nc_grade" style="width:60px" placeholder="7"></div>' +
+    '<div><div class="flabel">구분</div><select class="finput" id="nc_type" style="width:90px">' +
+      '<option value="과목">과목</option><option value="동아리">동아리</option></select></div>' +
+    '<div><div class="flabel">과목명(KR)</div><input class="finput" id="nc_kr" style="width:140px"></div>' +
+    '<div><div class="flabel">과목명(EN)</div><input class="finput" id="nc_en" style="width:140px"></div>' +
+    '<div><div class="flabel">언어</div><input class="finput" id="nc_lang" style="width:70px" placeholder="English"></div>' +
+    '<div><div class="flabel">담당교사 1학기</div><input class="finput" id="nc_t1" style="width:140px" placeholder="이름,이름"></div>' +
+    '<div><div class="flabel">담당교사 2학기</div><input class="finput" id="nc_t2" style="width:140px"></div>' +
+    '<button class="btn-teal" onclick="addCurriculumRow()">추가</button>' +
+    '</div></div>' +
+    '</div>';
   wrap.innerHTML = html;
+}
+
+async function addCurriculumRow() {
+  var fields = {
+    grade:     document.getElementById('nc_grade').value.trim(),
+    type:      document.getElementById('nc_type').value,
+    nameKR:    document.getElementById('nc_kr').value.trim(),
+    nameEN:    document.getElementById('nc_en').value.trim(),
+    language:  document.getElementById('nc_lang').value.trim(),
+    teachers1: document.getElementById('nc_t1').value.trim(),
+    teachers2: document.getElementById('nc_t2').value.trim()
+  };
+  if (!fields.nameKR) { toast('과목명(KR)은 필수입니다.', 'error'); return; }
+  try {
+    var res = await API.addCurriculum(fields);
+    if (res.success) {
+      toast('추가 완료 ✓', 'success');
+      APP.cache.loaded = false;
+      loadCurriculumList();
+    } else toast('추가 실패: ' + res.error, 'error');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteCurriculumRow(i) {
+  var c = _currData[i];
+  if (!confirm('[' + c.nameKR + '] 과목을 삭제하시겠습니까?')) return;
+  try {
+    var res = await API.deleteCurriculum(c.rowIndex);
+    if (res.success) {
+      toast('삭제 완료 ✓', 'success');
+      APP.cache.loaded = false;
+      loadCurriculumList();
+    } else toast('삭제 실패: ' + res.error, 'error');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 async function saveCurriculum(i) {
@@ -1431,7 +1485,10 @@ async function openSettingsModal() {
   // 항상 최신 설정 로드
   try {
     var res = await API.getSettings();
-    if (res && res.success) APP.settings = res.data;
+    if (res && res.success) {
+      APP.settings = res.data;
+      mergeCustomModels(res.data.customModels); // 커스텀 모델 병합
+    }
   } catch(e) {}
   var s = APP.settings || {};
   document.getElementById('setEngine').value = s.engine || 'claude';
