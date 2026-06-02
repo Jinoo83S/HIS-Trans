@@ -112,6 +112,10 @@ async function loadInitialData(force) {
 }
 
 function renderSubjectSelect() {
+  // 검수/이력 뷰가 열려 있으면 해당 드롭다운도 갱신
+  if (APP.currentView === 'review')  populateSubjectDropdown('reviewSubjectSel');
+  if (APP.currentView === 'history') populateSubjectDropdown('historySubjectSel');
+
   var sel = document.getElementById('selSubject');
   var grade = document.getElementById('selGrade').value;
   var tab = APP.currentTab;
@@ -464,9 +468,27 @@ function setView(btn) {
   document.getElementById('vReview').style.display    = view === 'review'    ? '' : 'none';
   document.getElementById('vHistory').style.display   = view === 'history'   ? '' : 'none';
   document.getElementById('vAdmin').style.display     = view === 'admin'     ? '' : 'none';
-  if (view === 'review')  loadReviewList();
-  if (view === 'history') loadHistoryList();
+  if (view === 'review')  { populateSubjectDropdown('reviewSubjectSel');  loadReviewList(); }
+  if (view === 'history') { populateSubjectDropdown('historySubjectSel'); loadHistoryList(); }
 }
+
+// 검수/이력 뷰의 과목 드롭다운을 APP.subjects로 채움
+function populateSubjectDropdown(selId) {
+  var sel = document.getElementById(selId);
+  if (!sel) return;
+  var current = sel.value;
+  sel.innerHTML = '<option value="">-- 전체 --</option>' +
+    APP.subjects.map(function(s) {
+      return '<option value="' + s.subjectCode + '"' +
+        (s.subjectCode === current ? ' selected' : '') + '>' +
+        (s.type === '동아리' ? '🎭 ' : '📚 ') +
+        (s.grade ? 'G' + s.grade + ' | ' : '') +
+        s.nameKR + '</option>';
+    }).join('');
+}
+
+function onReviewSubjectChange()  { loadReviewList(); }
+function onHistorySubjectChange() { loadHistoryList(); }
 
 // ── 번역 ────────────────────────────────────────────────────
 function getPayload(row) {
@@ -673,8 +695,9 @@ async function loadReviewList() {
     year:     document.getElementById('selYear').value,
     semester: document.getElementById('selSem').value
   };
-  // 상단바에서 선택된 과목 필터
-  if (APP.selectedSubject) filters.subjectCode = APP.selectedSubject.subjectCode;
+  // 검수 뷰 자체 드롭다운에서 과목 필터
+  var reviewSel = document.getElementById('reviewSubjectSel');
+  if (reviewSel && reviewSel.value) filters.subjectCode = reviewSel.value;
   // 검수 교사: 담당 번역교사 필터 적용
   if (t.role === '검수' && t.assignedTo) {
     filters.assignedTeachers = t.assignedTo.split(',').map(s => s.trim()).filter(Boolean);
@@ -746,7 +769,8 @@ async function loadHistoryList() {
     year:     document.getElementById('selYear').value,
     semester: document.getElementById('selSem').value
   };
-  if (APP.selectedSubject) filters.subjectCode = APP.selectedSubject.subjectCode;
+  var historySel = document.getElementById('historySubjectSel');
+  if (historySel && historySel.value) filters.subjectCode = historySel.value;
   if (t.role === '검수' && t.assignedTo) {
     filters.assignedTeachers = t.assignedTo.split(',').map(s => s.trim()).filter(Boolean);
   }

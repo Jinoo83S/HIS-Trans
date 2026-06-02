@@ -100,6 +100,17 @@
 
   <!-- 검수 뷰 -->
   <div id="vReview" style="display:none">
+    <div style="padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);
+      display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--gray)">과목/동아리</span>
+      <select id="reviewSubjectSel" onchange="onReviewSubjectChange()"
+        style="background:var(--bg);border:1px solid var(--border);color:var(--text);
+        font-family:'Noto Sans KR',sans-serif;font-size:12px;padding:5px 8px;
+        border-radius:6px;min-width:240px">
+        <option value="">-- 전체 --</option>
+      </select>
+      <button class="btn-icon" onclick="loadReviewList()" style="flex-shrink:0">🔄 새로고침</button>
+    </div>
     <div class="empty-state" id="emptyReview">
       <div class="eicon">🔍</div><p>검수할 항목이 없습니다.</p>
     </div>
@@ -110,9 +121,20 @@
   </div>
 
   <!-- 관리 뷰 -->
-  <div id="vHistory" style="display:none;padding:16px;overflow:auto">
-    <div id="historyContent">
-      <div class="empty-state"><div class="eicon">📋</div><p>과목을 선택하고 이력 탭을 클릭하세요.</p></div>
+  <div id="vHistory" style="display:none;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);
+      display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0">
+      <span style="font-size:11px;color:var(--gray)">과목/동아리</span>
+      <select id="historySubjectSel" onchange="onHistorySubjectChange()"
+        style="background:var(--bg);border:1px solid var(--border);color:var(--text);
+        font-family:'Noto Sans KR',sans-serif;font-size:12px;padding:5px 8px;
+        border-radius:6px;min-width:240px">
+        <option value="">-- 전체 --</option>
+      </select>
+      <button class="btn-icon" onclick="loadHistoryList()" style="flex-shrink:0">🔄 새로고침</button>
+    </div>
+    <div id="historyContent" style="flex:1;overflow:auto;padding:16px">
+      <div class="empty-state"><div class="eicon">📋</div><p>과목을 선택하세요.</p></div>
     </div>
   </div>
 
