@@ -80,7 +80,7 @@ var API = (function() {
     suggestNeisStyle:   (text, model, engine)   => call('suggestNeisStyle', { text, model, engine }),
 
     // 관리자
-    saveApiKeys:        (openai, anthropic)     => call('saveApiKeys', { openaiKey: openai, anthropicKey: anthropic }),
+    saveApiKeys:        (openai, anthropic, gemini) => call('saveApiKeys', { openaiKey: openai, anthropicKey: anthropic, geminiKey: gemini }),
     getModels:          ()                      => call('getModels'),
   };
 })();

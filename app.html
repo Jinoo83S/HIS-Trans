@@ -59,9 +59,10 @@
       <select id="selTgt"><option value="Korean">Korean</option><option value="English">English</option></select></div>
     <div class="ctrl-g engine-ctrl"><span class="clabel">Engine</span>
       <select id="selEngine" onchange="onEngineChange();saveEngineSettingFromToolbar()">
-        <option value="google">Google (무료)</option>
-        <option value="gpt">GPT</option>
         <option value="claude">Claude</option>
+        <option value="gpt">GPT</option>
+        <option value="gemini">Gemini (무료)</option>
+        <option value="google">Google 번역 (무료)</option>
       </select></div>
     <div class="ctrl-g engine-ctrl"><span class="clabel">Model</span>
       <select id="selModel" onchange="saveEngineSettingFromToolbar()"></select></div>
@@ -139,7 +140,8 @@
       <div style="flex:1;min-width:120px"><div class="flabel">엔진</div>
         <select class="finput" id="setEngine" onchange="onSetEngineChange()">
           <option value="claude">Claude</option><option value="gpt">GPT</option>
-          <option value="google">Google</option></select></div>
+          <option value="gemini">Gemini</option>
+          <option value="google">Google 번역</option></select></div>
       <div style="flex:1;min-width:200px"><div class="flabel">모델
         <button type="button" onclick="addCustomModel()" title="모델 추가"
           style="margin-left:6px;background:var(--teal);color:#fff;border:none;border-radius:4px;
@@ -232,6 +234,10 @@
     <div class="frow">
       <label class="flabel">Anthropic API Key</label>
       <input type="password" class="finput" id="antKey" placeholder="sk-ant-...">
+    </div>
+    <div class="frow">
+      <label class="flabel">Gemini API Key <span style="color:var(--teal);font-size:11px">(무료 - Google AI Studio)</span></label>
+      <input type="password" class="finput" id="gemKey" placeholder="AIza...">
     </div>
     <div class="mfooter">
       <button class="btn-cancel" onclick="closeModal('apiOverlay')">취소</button>

@@ -13,6 +13,7 @@ var APP = {
   models: {
     gpt:    ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
     claude: ['claude-opus-4-8', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
+    gemini: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
     google: ['google-translate']
   },
   // 캐시
@@ -1535,7 +1536,7 @@ function onSetEngineChange() {
 
 function mergeCustomModels(custom) {
   if (!custom) return;
-  ['claude','gpt','google'].forEach(function(eng) {
+  ['claude','gpt','gemini','google'].forEach(function(eng) {
     if (custom[eng] && custom[eng].length) {
       custom[eng].forEach(function(m) {
         if (APP.models[eng].indexOf(m) === -1) APP.models[eng].push(m);
@@ -1548,12 +1549,13 @@ function mergeCustomModels(custom) {
 var BASE_MODELS = {
   claude: ['claude-opus-4-8','claude-opus-4-6','claude-sonnet-4-6','claude-haiku-4-5-20251001'],
   gpt:    ['gpt-4o','gpt-4o-mini','gpt-4-turbo','gpt-3.5-turbo'],
+  gemini: ['gemini-2.5-flash','gemini-2.5-pro','gemini-2.0-flash'],
   google: ['google-translate']
 };
 
 function getCustomModels() {
   var custom = {};
-  ['claude','gpt','google'].forEach(function(eng) {
+  ['claude','gpt','gemini','google'].forEach(function(eng) {
     custom[eng] = APP.models[eng].filter(function(m) {
       return BASE_MODELS[eng].indexOf(m) === -1;
     });
@@ -1665,8 +1667,9 @@ function openApiModal() { document.getElementById('apiOverlay').classList.add('o
 async function saveApiKeys() {
   var oai = document.getElementById('oaiKey').value;
   var ant = document.getElementById('antKey').value;
+  var gem = document.getElementById('gemKey') ? document.getElementById('gemKey').value : '';
   try {
-    var res = await API.saveApiKeys(oai, ant);
+    var res = await API.saveApiKeys(oai, ant, gem);
     if (res.success) { toast('API 키 저장 완료 ✓', 'success'); closeModal('apiOverlay'); }
     else toast('저장 실패', 'error');
   } catch(e) { toast(e.message, 'error'); }
