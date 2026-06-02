@@ -62,6 +62,7 @@ var API = (function() {
     // 저장/조회
     saveTrans:          (record)                => call('saveTrans', { record }),
     getTransList:       (filters)               => call('getTransList', { filters }),
+    getTransHistory:    (filters)               => call('getTransHistory', { filters }),
     updateTrans:        (rowIndex, fields)       => call('updateTrans', { rowIndex, fields }),
 
     // NEIS

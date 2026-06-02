@@ -153,8 +153,9 @@ function renderSubjectSelect() {
         var opts = groups[teacher].map(function(s) {
           var allTeachers = s.teachers && s.teachers.length > 1
             ? ' [' + s.teachers.join(', ') + ']' : '';
+          var gradePrefix = tab === '과목' ? 'G' + s.grade + ' | ' : '';
           return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
-            `G${s.grade} | ${s.nameKR}${allTeachers}</option>`;
+            `${gradePrefix}${s.nameKR}${allTeachers}</option>`;
         }).join('');
         return `<optgroup label="👤 ${teacher}">${opts}</optgroup>`;
       }).join('');
@@ -460,9 +461,11 @@ function setView(btn) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('vTranslate').style.display = view === 'translate' ? '' : 'none';
-  document.getElementById('vReview').style.display    = view === 'review' ? '' : 'none';
-  document.getElementById('vAdmin').style.display     = view === 'admin' ? '' : 'none';
-  if (view === 'review') loadReviewList();
+  document.getElementById('vReview').style.display    = view === 'review'    ? '' : 'none';
+  document.getElementById('vHistory').style.display   = view === 'history'   ? '' : 'none';
+  document.getElementById('vAdmin').style.display     = view === 'admin'     ? '' : 'none';
+  if (view === 'review')  loadReviewList();
+  if (view === 'history') loadHistoryList();
 }
 
 // ── 번역 ────────────────────────────────────────────────────
@@ -667,9 +670,11 @@ async function loadReviewList() {
   showLoading('검수 목록 불러오는 중...');
   var t = APP.teacher;
   var filters = {
-    year: document.getElementById('selYear').value,
+    year:     document.getElementById('selYear').value,
     semester: document.getElementById('selSem').value
   };
+  // 상단바에서 선택된 과목 필터
+  if (APP.selectedSubject) filters.subjectCode = APP.selectedSubject.subjectCode;
   // 검수 교사: 담당 번역교사 필터 적용
   if (t.role === '검수' && t.assignedTo) {
     filters.assignedTeachers = t.assignedTo.split(',').map(s => s.trim()).filter(Boolean);
@@ -731,6 +736,73 @@ function copyReview(rowIndex) {
   if (!el?.value) { toast('최종본이 없습니다.', 'error'); return; }
   copyToClipboard(el.value);
   toast('클립보드 복사 완료 ✓', 'success');
+}
+
+// ── 번역 이력 뷰 ────────────────────────────────────────────
+async function loadHistoryList() {
+  showLoading('이력 불러오는 중...');
+  var t = APP.teacher;
+  var filters = {
+    year:     document.getElementById('selYear').value,
+    semester: document.getElementById('selSem').value
+  };
+  if (APP.selectedSubject) filters.subjectCode = APP.selectedSubject.subjectCode;
+  if (t.role === '검수' && t.assignedTo) {
+    filters.assignedTeachers = t.assignedTo.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  try {
+    var res = await API.getTransHistory(filters);
+    hideLoading();
+    renderHistoryTable(res.data || []);
+  } catch(e) { hideLoading(); toast(e.message, 'error'); }
+}
+
+function renderHistoryTable(data) {
+  var wrap = document.getElementById('historyContent');
+  if (!data.length) {
+    wrap.innerHTML = '<div class="empty-state"><div class="eicon">📋</div><p>이력이 없습니다.</p></div>';
+    return;
+  }
+
+  // 학생별 그룹핑
+  var groups = {};
+  var groupOrder = [];
+  data.forEach(function(r) {
+    var key = r.subjectNameKR + ' | ' + r.studentName;
+    if (!groups[key]) { groups[key] = []; groupOrder.push(key); }
+    groups[key].push(r);
+  });
+
+  wrap.innerHTML = groupOrder.map(function(key) {
+    var rows = groups[key];
+    var first = rows[0];
+    return '<div style="margin-bottom:16px;border:1px solid var(--border);border-radius:8px;overflow:hidden">' +
+      '<div style="background:var(--bg3);padding:8px 12px;font-size:12px;font-weight:600;color:var(--text)">' +
+        e(first.subjectNameKR) + ' — ' + e(first.studentName) + ' (' + e(first.studentNameEN) + ')' +
+        ' <span style="font-size:11px;color:var(--gray);font-weight:400">총 ' + rows.length + '건</span>' +
+      '</div>' +
+      '<table class="sheet" style="width:100%"><thead><tr>' +
+        '<th style="width:8%">저장일시</th><th style="width:5%">저장자</th>' +
+        '<th style="width:22%">번역 초본</th><th style="width:22%">최종본</th>' +
+        '<th style="width:15%">코멘트</th><th style="width:5%">글자수</th><th style="width:5%">상태</th>' +
+      '</tr></thead><tbody>' +
+      rows.map(function(r) {
+        var cc = (r.finalText || r.translatedDraft || '').length;
+        var ccCls = cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
+        var date = r.createdAt ? new Date(r.createdAt).toLocaleString('ko-KR',
+          {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
+        return '<tr>' +
+          '<td><div class="ci" style="font-size:10px">' + date + '</div></td>' +
+          '<td><div class="ci" style="font-size:11px">' + e(r.updatedBy||r.teacherName) + '</div></td>' +
+          '<td><div class="cta drft" style="min-height:40px;background:#f8fafc;padding:6px;font-size:11px;overflow:auto">' + e(r.translatedDraft) + '</div></td>' +
+          '<td><div class="cta fnl"  style="min-height:40px;padding:6px;font-size:11px;overflow:auto">' + e(r.finalText) + '</div></td>' +
+          '<td><div style="padding:6px;font-size:11px;color:var(--text2)">' + e(r.reviewerComment) + '</div></td>' +
+          '<td><div class="cc ' + ccCls + '">' + (cc||'-') + '</div></td>' +
+          '<td><div class="ci"><span class="sbadge s-' + r.status + '">' + r.status + '</span></div></td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+  }).join('');
 }
 
 // ── 관리 뷰 ─────────────────────────────────────────────────

@@ -23,6 +23,7 @@
   <nav class="hnav">
     <button class="nav-btn active" data-view="translate" onclick="setView(this)">번역 / Translate</button>
     <button class="nav-btn" data-view="review" onclick="setView(this)" id="navReview">검수 / Review</button>
+    <button class="nav-btn" data-view="history" onclick="setView(this)" id="navHistory">이력 / History</button>
     <button class="nav-btn" data-view="admin" onclick="setView(this)" id="navAdmin" style="display:none">관리 / Admin</button>
   </nav>
   <div class="hright">
@@ -109,6 +110,12 @@
   </div>
 
   <!-- 관리 뷰 -->
+  <div id="vHistory" style="display:none;padding:16px;overflow:auto">
+    <div id="historyContent">
+      <div class="empty-state"><div class="eicon">📋</div><p>과목을 선택하고 이력 탭을 클릭하세요.</p></div>
+    </div>
+  </div>
+
   <div id="vAdmin" style="display:none">
     <div style="padding:20px">
       <button class="btn-teal" onclick="openApiModal()" style="margin-right:8px">🔑 API 키 설정</button>
