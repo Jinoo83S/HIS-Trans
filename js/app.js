@@ -602,6 +602,70 @@ async function saveAll() {
   renderTable(); // 상태 아이콘 갱신
 }
 
+// ── NEIS 엑셀 다운로드 ──────────────────────────────────────────
+function downloadExcel() {
+  if (!APP.rows || !APP.rows.length) { toast('다운로드할 데이터가 없습니다.', 'error'); return; }
+  if (!APP.selectedSubject) { toast('과목을 선택하세요.', 'error'); return; }
+
+  var year = document.getElementById('selYear').value;
+  var sem  = document.getElementById('selSem').value;
+  var subj = APP.selectedSubject;
+  var TAB  = '\t';
+  var CRLF = '\r\n';
+
+  var headers = ['학년도','학기','학년','학생개인번호','과목','과목코드',
+    '반/번호','성명','학적변동  구분','세부능력 및 특기사항',
+    '영재\u00b7발명교육 기록사항','유의어  점검내역'];
+
+  var rows = [headers];
+
+  APP.rows.forEach(function(r) {
+    var s        = r.student;
+    var neisClass = s.neisClass || s.class  || '';
+    var neisNo    = s.neisNo    || s.number || '';
+    var hanBan    = (neisClass && neisNo) ? neisClass + '/' + neisNo : '';
+    var finalTxt  = r.finalText || r.translatedDraft || '';
+
+    rows.push([
+      year, sem, s.grade || '', s.neis || '',
+      subj.nameKR, '', hanBan, s.name || '',
+      '재학', finalTxt, '',
+      finalTxt ? '없음' : ''
+    ]);
+    rows.push(['','','','','','','','','','','','']);
+  });
+
+  function escCell(cell) {
+    var v = String(cell == null ? '' : cell);
+    if (v.indexOf(TAB) !== -1 || v.indexOf('\n') !== -1 || v.indexOf('"') !== -1) {
+      return '"' + v.replace(/"/g, '""') + '"';
+    }
+    return v;
+  }
+
+  var tsv = rows.map(function(r) {
+    return r.map(escCell).join(TAB);
+  }).join(CRLF);
+
+  var bom  = '\uFEFF';
+  var blob = new Blob([bom + tsv], { type: 'text/tab-separated-values;charset=utf-8' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+
+  var now   = new Date();
+  function pad(n) { return String(n).padStart(2, '0'); }
+  var stamp = now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()) +
+              pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());
+  var grade = APP.rows[0] ? APP.rows[0].student.grade : '';
+  var cls   = APP.rows[0] ? (APP.rows[0].student.neisClass || APP.rows[0].student.class) : '';
+  a.download = year + '_' + sem + '\ud559\uae30_' + grade + '\ud559\ub144_' + cls + '_' +
+               subj.nameKR + '_\uacfc\ubaa9\uc138\ud2b9_' + stamp + '.xlsx';
+  a.href = url;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('\uc5d1\uc140 \ub2e4\uc6b4\ub85c\ub4dc \uc644\ub8cc \u2713', 'success');
+}
+
 // ── NEIS 검토 ────────────────────────────────────────────────
 // ── 단어 단위 diff ────────────────────────────────────────────
 function buildDiffHtml(original, modified) {
