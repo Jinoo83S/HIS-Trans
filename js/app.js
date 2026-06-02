@@ -74,8 +74,7 @@ function initUI() {
   document.getElementById('selSem').value = (now.getMonth() + 1) <= 7 ? '1' : '2';
 
   onEngineChange();
-  loadInitialData();
-  hideLoading();
+  loadInitialData(); // hideLoading은 loadInitialData 내부에서 호출
 }
 
 // ── 과목 목록 ────────────────────────────────────────────────
@@ -181,7 +180,6 @@ async function onSubjectChange() {
 
   // 이력/검수 탭에서는 번역 렌더 스킵, 해당 뷰만 갱신
   if (APP.currentView === 'history') { loadHistoryList(); return; }
-  if (APP.currentView === 'review')  { loadReviewList();  return; }
 
   // 번역 탭: 캐시에서 즉시 로드
   var students = isClub
@@ -453,10 +451,8 @@ function setView(btn) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('vTranslate').style.display = view === 'translate' ? '' : 'none';
-  document.getElementById('vReview').style.display    = view === 'review'    ? '' : 'none';
   document.getElementById('vHistory').style.display   = view === 'history'   ? '' : 'none';
   document.getElementById('vAdmin').style.display     = view === 'admin'     ? '' : 'none';
-  if (view === 'review')  loadReviewList();
   if (view === 'history') loadHistoryList();
 }
 
@@ -576,7 +572,7 @@ async function saveAll() {
   if (!s) { toast('과목을 선택하세요.', 'error'); return; }
 
   // 내용이 있고 미저장인 행만 대상
-  var targets = APP.rows.filter(r => (r.sourceText || r.translatedDraft) && !r.rowIndex);
+  var targets = APP.rows.filter(r => (r.sourceText || r.translatedDraft) && (!r.rowIndex || r._dirty));
   if (!targets.length) {
     toast('저장할 항목이 없습니다. (이미 모두 저장됨)', 'success'); return;
   }
@@ -658,12 +654,12 @@ function downloadExcel() {
               pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());
   var grade = APP.rows[0] ? APP.rows[0].student.grade : '';
   var cls   = APP.rows[0] ? (APP.rows[0].student.neisClass || APP.rows[0].student.class) : '';
-  a.download = year + '_' + sem + '\ud559\uae30_' + grade + '\ud559\ub144_' + cls + '_' +
-               subj.nameKR + '_\uacfc\ubaa9\uc138\ud2b9_' + stamp + '.xlsx';
+  a.download = year + '_' + sem + '학기_' + grade + '학년_' + cls + '_' +
+               subj.nameKR + '_과목세특_' + stamp + '.tsv';
   a.href = url;
   a.click();
   URL.revokeObjectURL(url);
-  toast('\uc5d1\uc140 \ub2e4\uc6b4\ub85c\ub4dc \uc644\ub8cc \u2713', 'success');
+  toast('다운로드 완료 ✓', 'success');
 }
 
 // ── NEIS 검토 ────────────────────────────────────────────────
