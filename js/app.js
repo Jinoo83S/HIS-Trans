@@ -18,10 +18,12 @@ var APP = {
   // 캐시
   cache: {
     loaded:    false,
-    courseMap: {},   // subjectCode → [students]
-    clubMap:   {},   // clubName   → [students]
-    transMap:  {}    // subjectCode|studentName → trans record
-  }
+    courseMap: {},
+    clubMap:   {},
+    transMap:  {}
+  },
+  settings: null,  // 엔진/프롬프트/용어/예시
+  progressCancelled: false
 };
 
 // ── 초기화 ──────────────────────────────────────────────────
@@ -62,7 +64,13 @@ function initUI() {
   rb.textContent = t.role;
   rb.className = 'role-badge role-' + t.role;
 
-  if (t.role === '관리자') document.getElementById('navAdmin').style.display = '';
+  // 권한별 탭 표시
+  var role = t.role;
+  var canInput     = (role === '번역' || role === '관리자');
+  var canTranslate = (role === '검수' || role === '관리자');
+  if (canInput)     document.getElementById('navInput').style.display = '';
+  if (canTranslate) document.getElementById('navTranslate').style.display = '';
+  if (role === '관리자') document.getElementById('navAdmin').style.display = '';
 
   // 학년도 옵션
   var now = new Date(), curY = now.getFullYear();
@@ -73,8 +81,47 @@ function initUI() {
   }
   document.getElementById('selSem').value = (now.getMonth() + 1) <= 7 ? '1' : '2';
 
-  onEngineChange();
-  loadInitialData(); // hideLoading은 loadInitialData 내부에서 호출
+  // 기본 뷰 결정
+  var defaultView = canInput ? 'input' : (canTranslate ? 'translate' : 'admin');
+  APP.currentView = defaultView;
+
+  // 설정 로드 후 초기 데이터
+  loadSettings(function() {
+    onEngineChange();
+    applyDefaultView(defaultView);
+    loadInitialData();
+  });
+}
+
+function applyDefaultView(view) {
+  document.querySelectorAll('.nav-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.view === view);
+  });
+  document.getElementById('vInput').style.display     = view === 'input'     ? '' : 'none';
+  document.getElementById('vTranslate').style.display = view === 'translate' ? '' : 'none';
+  document.getElementById('vAdmin').style.display     = view === 'admin'     ? '' : 'none';
+}
+
+// 설정 로드 (엔진/프롬프트/용어/예시)
+function loadSettings(cb) {
+  API.getSettings().then(function(res) {
+    if (res && res.success) {
+      APP.settings = res.data;
+      // 엔진/모델/creativity 기본값 적용
+      var eng = document.getElementById('selEngine');
+      var mdl = document.getElementById('selModel');
+      var crt = document.getElementById('slCreat');
+      if (eng) eng.value = res.data.engine || 'claude';
+      onEngineChange();
+      if (mdl) mdl.value = res.data.model || 'claude-opus-4-8';
+      if (crt) { crt.value = res.data.creativity || '0.3';
+        var vc = document.getElementById('vCreat'); if (vc) vc.textContent = crt.value; }
+      // 엔진 설정: 관리자 외 비활성화 (읽기전용 표시)
+      var isAdmin = APP.teacher.role === '관리자';
+      [eng, mdl, crt].forEach(function(el) { if (el) el.disabled = !isAdmin; });
+    }
+    if (cb) cb();
+  }).catch(function() { if (cb) cb(); });
 }
 
 // ── 과목 목록 ────────────────────────────────────────────────
@@ -178,9 +225,6 @@ async function onSubjectChange() {
   var isClub      = APP.currentTab === '동아리';
   var subjectCode = APP.selectedSubject.subjectCode;
 
-  // 이력/검수 탭에서는 번역 렌더 스킵, 해당 뷰만 갱신
-  if (APP.currentView === 'history') { loadHistoryList(); return; }
-
   // 번역 탭: 캐시에서 즉시 로드
   var students = isClub
     ? (APP.cache.clubMap[subjectCode]   || [])
@@ -211,7 +255,7 @@ async function onSubjectChange() {
           comment: saved.reviewerComment||'', status: saved.status||'draft',
           rowIndex: saved.rowIndex||null, translating: false, _dirty: false };
       });
-      renderTable(); return;
+      renderCurrentView(); return;
     } catch(err) { hideLoading(); toast(err.message, 'error'); return; }
   }
 
@@ -231,13 +275,174 @@ async function onSubjectChange() {
       _dirty:          false
     };
   });
-  renderTable();
+  renderCurrentView();
 }
 
 function onFilterChange() {
   APP.cache.loaded = false;
   _historyAll = null; // 연도/학기 변경 시 이력 전체 캐시 무효화
   loadSubjects();
+}
+
+// ── 입력 뷰 (외국인 교사: 원문만 입력) ────────────────────────
+function renderInputTable() {
+  var head  = document.getElementById('inputHead');
+  var body  = document.getElementById('inputBody');
+  var table = document.getElementById('inputTable');
+  var empty = document.getElementById('emptyInput');
+
+  if (!APP.rows.length) {
+    table.style.display = 'none'; empty.style.display = 'block'; return;
+  }
+  table.style.display = ''; empty.style.display = 'none';
+
+  // colgroup
+  var cols = '<colgroup>' +
+    '<col style="width:10%">' +  // Name EN
+    '<col style="width:8%">' +   // 이름
+    '<col style="width:5%">' +   // Gr
+    '<col style="width:5%">' +   // Cls
+    '<col style="width:8%">' +   // NEIS
+    '<col style="width:50%">' +  // 원문 입력
+    '<col style="width:14%">' +  // 상태/저장
+    '</colgroup>';
+  var existing = table.querySelector('colgroup');
+  if (existing) existing.remove();
+  table.insertAdjacentHTML('afterbegin', cols);
+
+  head.innerHTML = '<tr>' +
+    '<th>Name (EN)</th><th>이름</th><th>Gr.</th><th>Cls.</th><th>NEIS</th>' +
+    '<th class="ths">원문 입력 (Source)</th><th>저장</th></tr>';
+
+  body.innerHTML = APP.rows.map(function(r, i) {
+    var s = r.student;
+    return '<tr id="irow_' + i + '">' +
+      '<td><div class="ci" style="font-size:11px">' + e(s.engName||'-') + '</div></td>' +
+      '<td><div class="ci" style="font-size:11px">' + e(s.name) + '</div></td>' +
+      '<td><div class="ci">' + s.grade + '</div></td>' +
+      '<td><div class="ci">' + s.class + '</div></td>' +
+      '<td><div class="ci ci-neis">' + e(s.neis||s.neisClass||'') + '</div></td>' +
+      '<td><textarea class="cta src" oninput="onInputSourceChange(' + i + ',this.value)">' + e(r.sourceText) + '</textarea></td>' +
+      '<td><div class="ci" style="padding:4px 2px">' +
+        buildInputStatus(r) +
+        '<button class="btn-cp" onclick="saveRow(' + i + ')" ' +
+        'style="margin-top:5px;width:100%;' +
+        (r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : '') + '">저장</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function buildInputStatus(r) {
+  if (!r.sourceText) return '<span class="sbadge s-draft">미입력</span>';
+  if (r._dirty || !r.rowIndex) return '<span style="font-size:10px;font-weight:700;color:var(--red)">● 미저장</span>';
+  return '<span class="sbadge s-reviewed">입력완료</span>';
+}
+
+function onInputSourceChange(i, val) {
+  APP.rows[i].sourceText = val;
+  APP.rows[i]._dirty = true;
+  var td = document.querySelector('#irow_' + i + ' td:last-child .ci');
+  if (td) td.innerHTML = buildInputStatus(APP.rows[i]) +
+    '<button class="btn-cp" onclick="saveRow(' + i + ')" ' +
+    'style="margin-top:5px;width:100%;background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700">저장</button>';
+}
+
+// ── 2단계 파이프라인 (단일 행) ────────────────────────────────
+async function pipelineRow(i) {
+  var row = APP.rows[i];
+  if (!row.sourceText || !row.sourceText.trim()) { toast('원문이 없습니다.', 'error'); return; }
+
+  showProgress('번역 진행 중', 1, 2);
+  setProgress(0, '1단계: 번역 중...', row.student.name);
+
+  try {
+    var res = await API.runPipeline({
+      step: 'both',
+      sourceLang: document.getElementById('selSrc').value,
+      targetLang: document.getElementById('selTgt').value,
+      text: row.sourceText,
+      studentName: row.student.name,
+      subjectName: APP.selectedSubject ? APP.selectedSubject.nameKR : ''
+    });
+    if (!res.success) {
+      hideProgress();
+      if (res.error && res.error.indexOf('NO_API_KEY') !== -1) showApiKeyAlert(res.error.replace('NO_API_KEY:',''));
+      else toast('번역 실패: ' + res.error, 'error');
+      return;
+    }
+    setProgress(100, '완료', row.student.name);
+    if (res.translatedDraft) row.translatedDraft = res.translatedDraft;
+    if (res.finalText) row.finalText = res.finalText;
+    if (res.memo) row.comment = res.memo;
+    row._dirty = true;
+    refreshRow(i);
+    setTimeout(hideProgress, 400);
+    toast('번역 완료 ✓', 'success');
+  } catch(err) {
+    hideProgress();
+    toast('오류: ' + err.message, 'error');
+  }
+}
+
+// ── 2단계 파이프라인 (전체) ───────────────────────────────────
+async function pipelineAll() {
+  var targets = APP.rows.filter(function(r) { return r.sourceText && r.sourceText.trim() && !r.finalText; });
+  if (!targets.length) { toast('번역할 항목이 없습니다.', 'error'); return; }
+
+  APP.progressCancelled = false;
+  showProgress('전체 번역 진행 중', 1, targets.length);
+
+  for (var idx = 0; idx < targets.length; idx++) {
+    if (APP.progressCancelled) { toast('중단되었습니다.', 'error'); break; }
+    var row = targets[idx];
+    var i = APP.rows.indexOf(row);
+    var pct = Math.round((idx / targets.length) * 100);
+    setProgress(pct, (idx+1) + '/' + targets.length + ' 번역 중...', row.student.name);
+
+    try {
+      var res = await API.runPipeline({
+        step: 'both',
+        sourceLang: document.getElementById('selSrc').value,
+        targetLang: document.getElementById('selTgt').value,
+        text: row.sourceText,
+        studentName: row.student.name,
+        subjectName: APP.selectedSubject ? APP.selectedSubject.nameKR : ''
+      });
+      if (res.success) {
+        if (res.translatedDraft) row.translatedDraft = res.translatedDraft;
+        if (res.finalText) row.finalText = res.finalText;
+        if (res.memo) row.comment = res.memo;
+        row._dirty = true;
+        refreshRow(i);
+      }
+    } catch(e) {}
+  }
+  setProgress(100, '완료', '');
+  setTimeout(hideProgress, 500);
+  toast('전체 번역 완료 ✓', 'success');
+}
+
+// ── 진행 팝업 ──────────────────────────────────────────────────
+function showProgress(title, cur, total) {
+  document.getElementById('progTitle').textContent = title;
+  document.getElementById('progOverlay') || document.getElementById('progressOverlay').classList.add('open');
+  document.getElementById('progressOverlay').classList.add('open');
+}
+function setProgress(pct, text, step) {
+  var bar = document.getElementById('progBar');
+  if (bar) bar.style.width = pct + '%';
+  var t = document.getElementById('progText');
+  if (t) t.textContent = text;
+  var s = document.getElementById('progStep');
+  if (s) s.textContent = step || '';
+}
+function hideProgress() {
+  document.getElementById('progressOverlay').classList.remove('open');
+}
+function cancelProgress() {
+  APP.progressCancelled = true;
+  hideProgress();
 }
 
 // ── 테이블 렌더링 ────────────────────────────────────────────
@@ -312,7 +517,7 @@ function rowHtml(r, i, role) {
     <td><textarea class="cta src" oninput="APP.rows[${i}].sourceText=this.value;markDirty(${i})"
       >${e(r.sourceText)}</textarea></td>
     <td class="ca">
-      <button class="btn-arrow" onclick="translateRow(${i})" title="번역"
+      <button class="btn-arrow" onclick="pipelineRow(${i})" title="번역"
         ${r.translating?'disabled':''} style="font-size:16px;background:none;border:none;
         cursor:pointer;color:var(--teal);padding:4px;transition:transform 0.15s"
         onmouseover="this.style.transform='scale(1.3)'"
@@ -450,10 +655,32 @@ function setView(btn) {
   APP.currentView = view;
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  document.getElementById('vInput').style.display     = view === 'input'     ? '' : 'none';
   document.getElementById('vTranslate').style.display = view === 'translate' ? '' : 'none';
-  document.getElementById('vHistory').style.display   = view === 'history'   ? '' : 'none';
   document.getElementById('vAdmin').style.display     = view === 'admin'     ? '' : 'none';
-  if (view === 'history') loadHistoryList();
+
+  // 뷰 전환 시 현재 선택 과목 다시 렌더
+  if (view === 'input' || view === 'translate') {
+    if (APP.selectedSubject) renderCurrentView();
+    else { showEmptyForView(view); }
+  }
+  if (view === 'admin') { renderAdminTab(); }
+}
+
+function showEmptyForView(view) {
+  if (view === 'input') {
+    document.getElementById('inputTable').style.display = 'none';
+    document.getElementById('emptyInput').style.display = 'block';
+  } else if (view === 'translate') {
+    document.getElementById('mainTable').style.display = 'none';
+    document.getElementById('emptyTrans').style.display = 'block';
+  }
+}
+
+// 현재 뷰에 맞는 테이블 렌더
+function renderCurrentView() {
+  if (APP.currentView === 'input')     renderInputTable();
+  else if (APP.currentView === 'translate') renderTable();
 }
 
 // ── 번역 ────────────────────────────────────────────────────
@@ -1088,6 +1315,71 @@ document.addEventListener('click', function(ev) {
 async function changeRole(name) {
   var nameKey = name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
   await saveTeacher(nameKey, name);
+}
+
+function renderAdminTab() {
+  loadTeacherList();
+}
+
+// ── 엔진·프롬프트 설정 모달 ──────────────────────────────────
+function openSettingsModal() {
+  var s = APP.settings || {};
+  document.getElementById('setEngine').value = s.engine || 'claude';
+  onSetEngineChange();
+  document.getElementById('setModel').value  = s.model || 'claude-opus-4-8';
+  document.getElementById('setCreat').value  = s.creativity || '0.3';
+  document.getElementById('setStep1').value  = s.step1_prompt || '';
+  document.getElementById('setStep2').value  = s.step2_prompt || '';
+  document.getElementById('settingsOverlay').classList.add('open');
+}
+
+function onSetEngineChange() {
+  var engine = document.getElementById('setEngine').value;
+  var sel = document.getElementById('setModel');
+  sel.innerHTML = (APP.models[engine] || []).map(function(m) {
+    return '<option value="' + m + '">' + m + '</option>';
+  }).join('');
+}
+
+async function saveSettingsModal() {
+  var data = {
+    engine:       document.getElementById('setEngine').value,
+    model:        document.getElementById('setModel').value,
+    creativity:   document.getElementById('setCreat').value,
+    step1_prompt: document.getElementById('setStep1').value,
+    step2_prompt: document.getElementById('setStep2').value
+  };
+  try {
+    var res = await API.saveSettings(data);
+    if (res.success) {
+      toast('설정 저장 완료 ✓', 'success');
+      closeModal('settingsOverlay');
+      loadSettings();
+    } else toast('저장 실패: ' + res.error, 'error');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── 용어·예시 모달 ──────────────────────────────────────────
+function openRefModal() {
+  var s = APP.settings || {};
+  document.getElementById('setTerms').value = s.terms || '';
+  document.getElementById('setExamples').value = (s.examples || []).join('\n\n');
+  document.getElementById('refOverlay').classList.add('open');
+}
+
+async function saveRefModal() {
+  var terms = document.getElementById('setTerms').value;
+  var examplesRaw = document.getElementById('setExamples').value;
+  // 빈 줄 2개로 예시 분리
+  var examples = examplesRaw.split(/\n\s*\n/).map(function(s){return s.trim();}).filter(Boolean);
+  try {
+    var res = await API.saveSettings({ terms: terms, examples: examples });
+    if (res.success) {
+      toast('용어·예시 저장 완료 ✓', 'success');
+      closeModal('refOverlay');
+      loadSettings();
+    } else toast('저장 실패: ' + res.error, 'error');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 function openApiModal() { document.getElementById('apiOverlay').classList.add('open'); }

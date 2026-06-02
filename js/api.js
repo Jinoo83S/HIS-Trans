@@ -58,6 +58,9 @@ var API = (function() {
 
     // 번역
     translate:          (payload)               => call('translate', { payload }),
+    runPipeline:        (payload)               => call('runPipeline', { payload }),
+    getSettings:        ()                      => call('getSettings'),
+    saveSettings:       (data)                  => call('saveSettings', { data }),
 
     // 저장/조회
     saveTrans:          (record)                => call('saveTrans', { record }),

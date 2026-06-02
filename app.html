@@ -21,9 +21,9 @@
   </div>
   <div class="hsep"></div>
   <nav class="hnav">
-    <button class="nav-btn active" data-view="translate" onclick="setView(this)">번역 / Translate</button>
-    <button class="nav-btn" data-view="history" onclick="setView(this)" id="navHistory">이력 / History</button>
-    <button class="nav-btn" data-view="admin" onclick="setView(this)" id="navAdmin" style="display:none">관리 / Admin</button>
+    <button class="nav-btn" data-view="input" onclick="setView(this)" id="navInput" style="display:none">✍️ 입력 / Input</button>
+    <button class="nav-btn" data-view="translate" onclick="setView(this)" id="navTranslate" style="display:none">🔄 번역 / Translate</button>
+    <button class="nav-btn" data-view="admin" onclick="setView(this)" id="navAdmin" style="display:none">⚙️ 관리 / Admin</button>
   </nav>
   <div class="hright">
     <div class="teacher-badge"><span id="tName">-</span></div>
@@ -71,7 +71,7 @@
         oninput="document.getElementById('vCreat').textContent=this.value">
       <span class="creat-val" id="vCreat">0.5</span></div>
     <button class="btn-icon" onclick="openPromptModal()">✏️ 프롬프트</button>
-    <button class="btn-teal" onclick="translateAll()">▶ 전체 번역</button>
+    <button class="btn-teal" onclick="pipelineAll()">▶ 전체 번역</button>
     <button class="btn-icon" onclick="loadInitialData(true)" title="데이터 새로고침" style="flex-shrink:0">🔄</button>
     <button class="btn-icon" onclick="saveAll()" style="border-color:#16a34a;color:#16a34a" id="btnSaveAll">💾 일괄 저장</button>
     <button class="btn-icon" onclick="downloadExcel()" style="border-color:#0369a1;color:#0369a1;flex-shrink:0" title="NEIS 엑셀 다운로드">📥 엑셀</button>
@@ -87,7 +87,19 @@
 <!-- 메인 -->
 <div id="main">
   <!-- 번역 뷰 -->
-  <div id="vTranslate">
+  <!-- 입력 뷰 (외국인 교사) -->
+  <div id="vInput" style="display:none">
+    <table class="sheet" id="inputTable" style="display:none">
+      <thead id="inputHead"></thead>
+      <tbody id="inputBody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyInput">
+      <div class="eicon">✍️</div><p>과목 또는 동아리를 선택하세요.</p>
+    </div>
+  </div>
+
+  <!-- 번역 뷰 (검수 교사) -->
+  <div id="vTranslate" style="display:none">
     <div class="empty-state" id="emptyTrans">
       <div class="eicon">📋</div>
       <p>과목 또는 동아리를 선택하세요.<br>Select a subject or club to begin.</p>
@@ -102,18 +114,75 @@
 
 
   <!-- 관리 뷰 -->
-  <div id="vHistory" style="display:none;overflow:auto;padding:16px">
-    <div id="historyContent">
-      <div class="empty-state"><div class="eicon">📋</div><p>과목을 선택하세요.</p></div>
+  <div id="vAdmin" style="display:none;overflow:auto">
+    <div style="padding:20px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        <button class="btn-teal" onclick="openApiModal()">🔑 API 키</button>
+        <button class="btn-icon" onclick="loadTeacherList()">👥 교사 권한</button>
+        <button class="btn-icon" onclick="openSettingsModal()">⚙️ 엔진·프롬프트</button>
+        <button class="btn-icon" onclick="openRefModal()">📚 용어·예시</button>
+      </div>
+      <div id="teacherList"></div>
     </div>
   </div>
+</div>
 
-  <div id="vAdmin" style="display:none">
-    <div style="padding:20px">
-      <button class="btn-teal" onclick="openApiModal()" style="margin-right:8px">🔑 API 키 설정</button>
-      <button class="btn-icon" onclick="loadTeacherList()">👥 교사 권한 관리</button>
-      <div id="teacherList" style="margin-top:20px"></div>
+<!-- 엔진·프롬프트 설정 모달 -->
+<div class="overlay" id="settingsOverlay">
+  <div class="modal" style="max-width:720px">
+    <button class="modal-x" onclick="closeModal('settingsOverlay')">×</button>
+    <h3>⚙️ 엔진 · 프롬프트 설정</h3>
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:120px"><div class="flabel">엔진</div>
+        <select class="finput" id="setEngine" onchange="onSetEngineChange()">
+          <option value="claude">Claude</option><option value="gpt">GPT</option>
+          <option value="google">Google</option></select></div>
+      <div style="flex:1;min-width:160px"><div class="flabel">모델</div>
+        <select class="finput" id="setModel"></select></div>
+      <div style="flex:0 0 100px"><div class="flabel">Creativity</div>
+        <input class="finput" id="setCreat" type="number" step="0.1" min="0" max="1" value="0.3"></div>
     </div>
+    <div class="frow"><div class="flabel">STEP 1 프롬프트 (번역)</div>
+      <textarea class="finput ftarea" id="setStep1" rows="6"></textarea></div>
+    <div class="frow"><div class="flabel">STEP 2 프롬프트 (세특 윤문)</div>
+      <textarea class="finput ftarea" id="setStep2" rows="8"></textarea></div>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="closeModal('settingsOverlay')">취소</button>
+      <button class="btn-save" onclick="saveSettingsModal()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 용어·예시 모달 -->
+<div class="overlay" id="refOverlay">
+  <div class="modal" style="max-width:720px">
+    <button class="modal-x" onclick="closeModal('refOverlay')">×</button>
+    <h3>📚 용어 대조표 · 우수 예시</h3>
+    <div class="frow"><div class="flabel">용어 대조표 (영어 → 한국 표준 용어)</div>
+      <textarea class="finput ftarea" id="setTerms" rows="6"
+        placeholder="- free verse → 자유시&#10;- prose → 산문"></textarea></div>
+    <div class="frow"><div class="flabel">우수 세특 예시 (여러 개는 빈 줄로 구분)</div>
+      <textarea class="finput ftarea" id="setExamples" rows="10"
+        placeholder="예시 1 내용...&#10;&#10;예시 2 내용..."></textarea></div>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="closeModal('refOverlay')">취소</button>
+      <button class="btn-save" onclick="saveRefModal()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 진행 상황 팝업 -->
+<div class="overlay" id="progressOverlay">
+  <div class="modal" style="max-width:420px;text-align:center">
+    <h3 id="progTitle">번역 진행 중</h3>
+    <div style="margin:20px 0">
+      <div style="background:var(--bg3);border-radius:8px;height:10px;overflow:hidden">
+        <div id="progBar" style="background:var(--teal);height:100%;width:0%;transition:width 0.3s"></div>
+      </div>
+      <div id="progText" style="margin-top:10px;font-size:13px;color:var(--text2)">준비 중...</div>
+      <div id="progStep" style="margin-top:6px;font-size:11px;color:var(--gray)"></div>
+    </div>
+    <button class="btn-cancel" id="progCancel" onclick="cancelProgress()">중단</button>
   </div>
 </div>
 
