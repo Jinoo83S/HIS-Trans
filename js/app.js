@@ -1076,7 +1076,15 @@ function buildStatusBadge(r) {
     var cls   = r.status === 'reviewed' ? 's-reviewed'
               : r.status === 'final'    ? 's-final'
               : 's-draft';
-    return '<span class="sbadge ' + cls + '">' + label + '</span>';
+    var badge = '<span class="sbadge ' + cls + '">' + label + '</span>';
+    // 검수완료/최종완료면 복사 버튼 노출
+    if (r.status === 'reviewed' || r.status === 'final') {
+      var idx = APP.rows.indexOf(r);
+      badge += '<button class="btn-cp" onclick="copyFinal(' + idx + ')" ' +
+        'style="margin-top:4px;width:100%;background:#dcfce7;' +
+        'border-color:#86efac;color:#166534;font-weight:600">📋 복사</button>';
+    }
+    return badge;
   }
   // 저장됨 + 수정됨
   return '<span class="sbadge s-draft">수정중</span>' +
