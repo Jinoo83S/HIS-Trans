@@ -349,7 +349,7 @@ function rowHtml(r, i, role) {
         '</span>' + cc + '/500' : '-'}
     </div></td>
     <td><div class="ci" style="padding:4px 2px">
-      ${buildStatusBadge(r)}
+      ${buildStatusBadge(r, i)}
       <button class="btn-cp" onclick="saveRow(${i})"
         style="margin-top:5px;width:100%;
         ${r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : ''}">
@@ -382,7 +382,7 @@ function showEmptyTrans() {
 function markDirty(i) {
   if (APP.rows[i]) { APP.rows[i]._dirty = true; }
   var td = document.querySelector('#row_' + i + ' td:last-child .ci');
-  if (td) td.innerHTML = buildStatusBadge(APP.rows[i]) +
+  if (td) td.innerHTML = buildStatusBadge(APP.rows[i], i) +
     '<button class="btn-cp" onclick="saveRow(' + i + ')" ' +
     'style="margin-top:5px;width:100%;background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700">저장</button>' +
     '<button class="btn-cp" onclick="copyFinal(' + i + ')" style="margin-top:3px;width:100%">복사</button>';
@@ -1127,7 +1127,7 @@ function resetUrl() {
 }
 
 // ── 유틸 ────────────────────────────────────────────────────
-function buildStatusBadge(r) {
+function buildStatusBadge(r, idx) {
   // 저장 안 됨
   if (!r.rowIndex) {
     return '<div style="font-size:10px;font-weight:700;color:var(--red)">● 미저장</div>';
@@ -1142,8 +1142,7 @@ function buildStatusBadge(r) {
               : 's-draft';
     var badge = '<span class="sbadge ' + cls + '">' + label + '</span>';
     // 검수완료/최종완료면 복사 버튼 노출
-    if (r.status === 'reviewed' || r.status === 'final') {
-      var idx = APP.rows.indexOf(r);
+    if ((r.status === 'reviewed' || r.status === 'final') && idx !== undefined) {
       badge += '<button class="btn-cp" onclick="copyFinal(' + idx + ')" ' +
         'style="margin-top:4px;width:100%;background:#dcfce7;' +
         'border-color:#86efac;color:#166534;font-weight:600">📋 복사</button>';
