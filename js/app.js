@@ -232,13 +232,13 @@ async function onSubjectChange() {
   renderTable();
 
   // 검수/이력 탭이 열려있으면 즉시 갱신
-  _historyCache = null; // 과목 변경 시 이력 캐시 무효화
   if (APP.currentView === 'review')  loadReviewList();
   if (APP.currentView === 'history') loadHistoryList();
 }
 
 function onFilterChange() {
-  APP.cache.loaded = false; // 년도/학기 변경 시 캐시 무효화
+  APP.cache.loaded = false;
+  _historyAll = null; // 연도/학기 변경 시 이력 전체 캐시 무효화
   loadSubjects();
 }
 
@@ -789,37 +789,41 @@ function copyReview(rowIndex) {
 }
 
 // ── 번역 이력 뷰 ────────────────────────────────────────────
-var _historyCache = null;
-var _historyCacheKey = '';
+// 이력: 전체를 한 번만 로드, 과목 변경 시 클라이언트 필터링
+var _historyAll  = null;  // 전체 이력 (연도/학기 기준)
+var _historyYear = '';
+var _historySem  = '';
 
 async function loadHistoryList() {
-  var subjectCode = APP.selectedSubject ? APP.selectedSubject.subjectCode : '';
-  var cacheKey = subjectCode + '_' + document.getElementById('selYear').value +
-    '_' + document.getElementById('selSem').value;
+  var year = document.getElementById('selYear').value;
+  var sem  = document.getElementById('selSem').value;
 
-  // 같은 과목은 재호출 없이 렌더만
-  if (_historyCache && _historyCacheKey === cacheKey) {
-    renderHistoryTable(_historyCache);
+  // 연도/학기가 같으면 전체 재호출 없이 클라이언트 필터링
+  if (_historyAll && _historyYear === year && _historySem === sem) {
+    renderHistoryTable(filterHistory(_historyAll));
     return;
   }
 
   showLoading('이력 불러오는 중...');
   var t = APP.teacher;
-  var filters = {
-    year:     document.getElementById('selYear').value,
-    semester: document.getElementById('selSem').value
-  };
-  if (subjectCode) filters.subjectCode = subjectCode;
+  var filters = { year: year, semester: sem };
   if (t.role === '검수' && t.assignedTo) {
     filters.assignedTeachers = t.assignedTo.split(',').map(s => s.trim()).filter(Boolean);
   }
   try {
     var res = await API.getTransHistory(filters);
     hideLoading();
-    _historyCache    = res.data || [];
-    _historyCacheKey = cacheKey;
-    renderHistoryTable(_historyCache);
+    _historyAll  = res.data || [];
+    _historyYear = year;
+    _historySem  = sem;
+    renderHistoryTable(filterHistory(_historyAll));
   } catch(e) { hideLoading(); toast(e.message, 'error'); }
+}
+
+function filterHistory(data) {
+  var subjectCode = APP.selectedSubject ? APP.selectedSubject.subjectCode : '';
+  if (!subjectCode) return data;
+  return data.filter(function(r) { return r.subjectCode === subjectCode; });
 }
 
 function renderHistoryTable(data) {
