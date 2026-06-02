@@ -232,6 +232,7 @@ async function onSubjectChange() {
   renderTable();
 
   // 검수/이력 탭이 열려있으면 즉시 갱신
+  _historyCache = null; // 과목 변경 시 이력 캐시 무효화
   if (APP.currentView === 'review')  loadReviewList();
   if (APP.currentView === 'history') loadHistoryList();
 }
@@ -672,6 +673,12 @@ async function checkNeis(i) {
 
 // ── 검수 뷰 ─────────────────────────────────────────────────
 async function loadReviewList() {
+  // 캐시가 있으면 즉시 렌더링
+  if (APP.cache.loaded) {
+    renderReviewTable(getReviewDataFromCache());
+    return;
+  }
+  // 캐시 없으면 API 호출
   showLoading('검수 목록 불러오는 중...');
   var t = APP.teacher;
   var filters = {
@@ -679,7 +686,6 @@ async function loadReviewList() {
     semester: document.getElementById('selSem').value
   };
   if (APP.selectedSubject) filters.subjectCode = APP.selectedSubject.subjectCode;
-  // 검수 교사: 담당 번역교사 필터 적용
   if (t.role === '검수' && t.assignedTo) {
     filters.assignedTeachers = t.assignedTo.split(',').map(s => s.trim()).filter(Boolean);
   }
@@ -688,6 +694,46 @@ async function loadReviewList() {
     hideLoading();
     renderReviewTable(res.data || []);
   } catch(e) { hideLoading(); toast(e.message, 'error'); }
+}
+
+function getReviewDataFromCache() {
+  var subjectCode = APP.selectedSubject ? APP.selectedSubject.subjectCode : null;
+  var assignedTeachers = [];
+  var t = APP.teacher;
+  if (t.role === '검수' && t.assignedTo) {
+    assignedTeachers = t.assignedTo.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  }
+
+  var results = [];
+  // transMap key = subjectCode|studentName → 최신 레코드만 있음
+  Object.keys(APP.cache.transMap).forEach(function(key) {
+    var rec = APP.cache.transMap[key];
+    // 과목 필터
+    var parts = key.split('|');
+    var recCode = parts[0];
+    if (subjectCode && recCode !== subjectCode) return;
+    // 검수 교사 담당 필터 (teacherName 기준)
+    if (assignedTeachers.length && assignedTeachers.indexOf(rec.teacherName || '') === -1) return;
+
+    results.push({
+      rowIndex:        rec.rowIndex,
+      studentName:     parts[1] || '',
+      studentNameEN:   rec.studentNameEN || '',
+      grade:           rec.grade || '',
+      subjectNameKR:   rec.subjectNameKR || recCode,
+      translatedDraft: rec.translatedDraft || '',
+      finalText:       rec.finalText || '',
+      reviewerComment: rec.reviewerComment || '',
+      status:          rec.status || 'draft'
+    });
+  });
+
+  // 과목 → 학생명 순 정렬
+  results.sort(function(a, b) {
+    if (a.subjectNameKR !== b.subjectNameKR) return a.subjectNameKR.localeCompare(b.subjectNameKR, 'ko');
+    return a.studentName.localeCompare(b.studentName, 'ko');
+  });
+  return results;
 }
 
 function renderReviewTable(data) {
@@ -743,21 +789,36 @@ function copyReview(rowIndex) {
 }
 
 // ── 번역 이력 뷰 ────────────────────────────────────────────
+var _historyCache = null;
+var _historyCacheKey = '';
+
 async function loadHistoryList() {
+  var subjectCode = APP.selectedSubject ? APP.selectedSubject.subjectCode : '';
+  var cacheKey = subjectCode + '_' + document.getElementById('selYear').value +
+    '_' + document.getElementById('selSem').value;
+
+  // 같은 과목은 재호출 없이 렌더만
+  if (_historyCache && _historyCacheKey === cacheKey) {
+    renderHistoryTable(_historyCache);
+    return;
+  }
+
   showLoading('이력 불러오는 중...');
   var t = APP.teacher;
   var filters = {
     year:     document.getElementById('selYear').value,
     semester: document.getElementById('selSem').value
   };
-  if (APP.selectedSubject) filters.subjectCode = APP.selectedSubject.subjectCode;
+  if (subjectCode) filters.subjectCode = subjectCode;
   if (t.role === '검수' && t.assignedTo) {
     filters.assignedTeachers = t.assignedTo.split(',').map(s => s.trim()).filter(Boolean);
   }
   try {
     var res = await API.getTransHistory(filters);
     hideLoading();
-    renderHistoryTable(res.data || []);
+    _historyCache    = res.data || [];
+    _historyCacheKey = cacheKey;
+    renderHistoryTable(_historyCache);
   } catch(e) { hideLoading(); toast(e.message, 'error'); }
 }
 
