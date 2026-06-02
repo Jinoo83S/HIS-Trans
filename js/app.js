@@ -531,38 +531,27 @@ async function saveRow(i) {
 
   try {
     var res;
-    if (row.rowIndex) {
-      // 기존 레코드 업데이트
-      res = await API.updateTrans(row.rowIndex, {
-        sourceText:      row.sourceText,
-        translatedDraft: row.translatedDraft,
-        finalText:       row.finalText,
-        reviewerComment: row.comment,
-        status:          row.finalText ? 'reviewed' : 'draft'
-      });
-    } else {
-      // 신규 저장
-      var record = {
-        year:         document.getElementById('selYear').value,
-        semester:     document.getElementById('selSem').value,
-        type:         APP.currentTab,
-        subjectCode:  s.subjectCode, subjectNameKR: s.nameKR, subjectNameEN: s.nameEN,
-        studentName:  row.student.name, studentNameEN: row.student.engName,
-        grade:        row.student.grade, class: row.student.class,
-        neisClass:    row.student.neisClass, neisNo: row.student.neisNo,
-        sourceLang:   document.getElementById('selSrc').value,
-        targetLang:   document.getElementById('selTgt').value,
-        model:        document.getElementById('selModel').value,
-        creativity:   document.getElementById('slCreat').value,
-        prompt:       APP.prompt,
-        sourceText:      row.sourceText,
-        translatedDraft: row.translatedDraft,
-        finalText:       row.finalText,
-        reviewerComment: row.comment
-      };
-      res = await API.saveTrans(record);
-      if (res && res.success) row.rowIndex = res.rowIndex;
-    }
+    // 신규/수정 모두 새 행으로 추가 (기존 데이터 보존)
+    var record = {
+      year:         document.getElementById('selYear').value,
+      semester:     document.getElementById('selSem').value,
+      type:         APP.currentTab,
+      subjectCode:  s.subjectCode, subjectNameKR: s.nameKR, subjectNameEN: s.nameEN,
+      studentName:  row.student.name, studentNameEN: row.student.engName,
+      grade:        row.student.grade, class: row.student.class,
+      neisClass:    row.student.neisClass, neisNo: row.student.neisNo,
+      sourceLang:   document.getElementById('selSrc').value,
+      targetLang:   document.getElementById('selTgt').value,
+      model:        document.getElementById('selModel').value,
+      creativity:   document.getElementById('slCreat').value,
+      prompt:       APP.prompt,
+      sourceText:      row.sourceText,
+      translatedDraft: row.translatedDraft,
+      finalText:       row.finalText,
+      reviewerComment: row.comment
+    };
+    res = await API.saveTrans(record);
+    if (res && res.success) row.rowIndex = res.rowIndex;
     if (res && res.success) {
       row.status = row.finalText ? 'reviewed' : 'draft';
       row._dirty = false;
