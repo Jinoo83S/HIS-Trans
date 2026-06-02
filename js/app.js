@@ -109,7 +109,8 @@ function renderSubjectSelect() {
       var ta = (a.teachers && a.teachers[0]) || '';
       var tb = (b.teachers && b.teachers[0]) || '';
       if (ta !== tb) return ta.localeCompare(tb, 'ko');
-      return String(a.grade).localeCompare(String(b.grade));
+      // 같은 교사 내에서는 학년 순
+      return Number(a.grade) - Number(b.grade);
     });
   }
 
@@ -121,6 +122,10 @@ function renderSubjectSelect() {
       var teacher = (s.teachers && s.teachers[0]) || '(미배정)';
       if (!groups[teacher]) { groups[teacher] = []; groupOrder.push(teacher); }
       groups[teacher].push(s);
+    });
+    // 각 교사 그룹 내 학년 순 정렬
+    groupOrder.forEach(function(t) {
+      groups[t].sort(function(a, b) { return Number(a.grade) - Number(b.grade); });
     });
 
     sel.innerHTML = '<option value="">-- ' +
