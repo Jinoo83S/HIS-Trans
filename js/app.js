@@ -1684,7 +1684,7 @@ async function saveRefModal() {
   } catch(e) { toast(e.message, 'error'); }
 }
 
-function openApiModal() { document.getElementById('apiOverlay').classList.add('open'); }
+function openApiModal() { document.getElementById('apiOverlay').classList.add('open'); checkApiKeysStatus(); }
 
 async function saveApiKeys() {
   var oai = document.getElementById('oaiKey').value;
@@ -1692,9 +1692,27 @@ async function saveApiKeys() {
   var gem = document.getElementById('gemKey') ? document.getElementById('gemKey').value : '';
   try {
     var res = await API.saveApiKeys(oai, ant, gem);
-    if (res.success) { toast('API 키 저장 완료 ✓', 'success'); closeModal('apiOverlay'); }
-    else toast('저장 실패', 'error');
+    if (res.success) {
+      toast('API 키 저장 완료 ✓', 'success');
+      checkApiKeysStatus(); // 저장 직후 확인
+    } else toast('저장 실패', 'error');
   } catch(e) { toast(e.message, 'error'); }
+}
+
+async function checkApiKeysStatus() {
+  try {
+    var res = await API.checkApiKeys();
+    if (res.success) {
+      var d = res.data;
+      var el = document.getElementById('apiKeyStatus');
+      if (el) el.innerHTML =
+        '<div style="margin-top:10px;padding:10px;background:var(--bg3);border-radius:6px;font-size:11px;line-height:1.8">' +
+        '<b>저장 상태:</b><br>' +
+        'OpenAI: ' + e(d.openai) + '<br>' +
+        'Anthropic: ' + e(d.anthropic) + '<br>' +
+        'Gemini: ' + e(d.gemini) + '</div>';
+    }
+  } catch(err) {}
 }
 
 // ── URL 모달 ─────────────────────────────────────────────────

@@ -81,6 +81,7 @@ var API = (function() {
 
     // 관리자
     saveApiKeys:        (openai, anthropic, gemini) => call('saveApiKeys', { openaiKey: openai, anthropicKey: anthropic, geminiKey: gemini }),
+    checkApiKeys:       ()                      => call('checkApiKeys'),
     getModels:          ()                      => call('getModels'),
   };
 })();
