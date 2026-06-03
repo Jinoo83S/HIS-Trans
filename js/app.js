@@ -58,6 +58,25 @@ window.onload = async function() {
   }
 };
 
+function relayout() {
+  var header  = document.getElementById('header');
+  var toolbar = document.getElementById('toolbar');
+  var tabs    = document.getElementById('tabs');
+  var main    = document.getElementById('main');
+  if (!header || !main) return;
+
+  var hH = header.offsetHeight;
+  var tbH = (toolbar && toolbar.style.display !== 'none') ? toolbar.offsetHeight : 0;
+  var tabH = (tabs && tabs.style.display !== 'none') ? tabs.offsetHeight : 0;
+
+  // toolbar / tabs 위치 고정 재배치
+  if (toolbar) toolbar.style.top = hH + 'px';
+  if (tabs)    tabs.style.top    = (hH + tbH) + 'px';
+  main.style.top = (hH + tbH + tabH) + 'px';
+}
+
+window.addEventListener('resize', relayout);
+
 function initUI() {
   var t = APP.teacher;
   document.getElementById('tName').textContent = t.name + ' / ' + t.fullName;
@@ -91,6 +110,7 @@ function initUI() {
     onEngineChange();
     applyDefaultView(defaultView);
     loadInitialData();
+    setTimeout(relayout, 100);
   });
 }
 
@@ -105,6 +125,7 @@ function applyDefaultView(view) {
   toggleToolbarMode(isAdmin);
   document.getElementById('tabs').style.display = isAdmin ? 'none' : '';
   if (view === 'admin') renderAdminTab();
+  setTimeout(relayout, 0);
 }
 
 // 관리 탭: 번역 전용 컨트롤 숨김, 엔진 컨트롤만 표시

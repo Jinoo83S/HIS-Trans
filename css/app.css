@@ -53,11 +53,11 @@ html, body { height: 100%; overflow: hidden; font-family: 'Noto Sans KR', sans-s
 .btn-sm.danger:hover { color: var(--red); border-color: #fca5a5; background: #fff1f2; }
 
 /* ── 툴바 ── */
-#toolbar { position: fixed; top: var(--hh); left: 0; right: 0; height: var(--tbh);
+#toolbar { position: fixed; top: var(--hh); left: 0; right: 0; min-height: var(--tbh);
   background: var(--bg2); border-bottom: 1px solid var(--border);
-  padding: 0 16px; z-index: 90; display: flex; align-items: center;
+  padding: 6px 16px; z-index: 90; display: flex; align-items: center;
   box-shadow: var(--shadow); }
-.tb-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; overflow-x: auto; width: 100%; }
+.tb-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; }
 .tb-row::-webkit-scrollbar { height: 3px; }
 .tb-row::-webkit-scrollbar-thumb { background: var(--border); }
 .ctrl-g { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
