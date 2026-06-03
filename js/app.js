@@ -363,11 +363,11 @@ function renderInputTable() {
       '<td><div class="ci">' + s.class + '</div></td>' +
       '<td><div class="ci ci-neis">' + e(s.neis||s.neisClass||'') + '</div></td>' +
       '<td><textarea class="cta src" oninput="onInputSourceChange(' + i + ',this.value)">' + e(r.sourceText) + '</textarea></td>' +
-      '<td><div class="ci" style="padding:4px 2px">' +
-        buildInputStatus(r) +
-        '<button class="btn-cp" onclick="saveRow(' + i + ')" ' +
-        'style="margin-top:5px;width:100%;' +
-        (r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : '') + '">저장</button>' +
+      '<td><div class="ci" style="padding:5px 4px;display:flex;flex-direction:column;gap:5px;align-items:stretch">' +
+        '<div style="text-align:center">' + buildInputStatus(r) + '</div>' +
+        '<button class="btn-tr" onclick="saveRow(' + i + ')" ' +
+        'style="width:100%;' +
+        (r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : '') + '">💾 저장</button>' +
       '</div></td>' +
     '</tr>';
   }).join('');
@@ -382,10 +382,11 @@ function buildInputStatus(r) {
 function onInputSourceChange(i, val) {
   APP.rows[i].sourceText = val;
   APP.rows[i]._dirty = true;
-  var td = document.querySelector('#irow_' + i + ' td:last-child .ci');
-  if (td) td.innerHTML = buildInputStatus(APP.rows[i]) +
-    '<button class="btn-cp" onclick="saveRow(' + i + ')" ' +
-    'style="margin-top:5px;width:100%;background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700">저장</button>';
+  var cell = document.querySelector('#irow_' + i + ' td:last-child .ci');
+  if (cell) cell.innerHTML =
+    '<div style="text-align:center">' + buildInputStatus(APP.rows[i]) + '</div>' +
+    '<button class="btn-tr" onclick="saveRow(' + i + ')" ' +
+    'style="width:100%;background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700">💾 저장</button>';
 }
 
 // ── 2단계 파이프라인 (단일 행) ────────────────────────────────
