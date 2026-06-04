@@ -1591,8 +1591,9 @@ function renderTeacherTable() {
         <td><div class="ci">${e(t.homeroom)}</div></td>
         <td><div class="ci" style="font-size:11px">${e(t.club||'')}</div></td>
         <td><div class="ci">
-          <select id="role_${nameKey}" onchange="onRoleChange('${nameKey}','${t.name}')"
-            style="border:1px solid var(--border);border-radius:4px;font-size:11px;padding:3px 6px;background:var(--bg);color:var(--text)">
+          <select id="role_${nameKey}" class="role-sel role-sel-${t.role}"
+            onchange="onRoleChange('${nameKey}','${t.name}');updateRoleColor(this)"
+            style="border:1px solid var(--border);border-radius:4px;font-size:11px;padding:3px 6px;font-weight:700">
             ${['번역','검수','관리자','일반'].map(r =>
               `<option value="${r}" ${r===t.role?'selected':''}>${r}</option>`).join('')}
           </select>
@@ -1636,6 +1637,11 @@ function onRoleChange(nameKey, name) {
   } else {
     wrap.innerHTML = '<span style="color:var(--gray);font-size:11px">-</span>';
   }
+}
+
+// 권한 드롭다운 색상 갱신
+function updateRoleColor(sel) {
+  sel.className = 'role-sel role-sel-' + sel.value;
 }
 
 async function saveTeacher(nameKey, name) {

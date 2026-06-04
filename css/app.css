@@ -233,3 +233,10 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance
 .col-resizer { position: absolute; top: 0; right: 0; width: 8px; height: 100%;
   cursor: col-resize; z-index: 30; user-select: none; }
 .col-resizer:hover { background: var(--teal); opacity: 0.4; }
+
+/* 권한 드롭다운 색상 */
+.role-sel { cursor: pointer; outline: none; }
+.role-sel-번역    { background: #dbeafe; color: #1e40af; border-color: #93c5fd !important; }
+.role-sel-검수    { background: #dcfce7; color: #166534; border-color: #86efac !important; }
+.role-sel-관리자  { background: #fae8ff; color: #86198f; border-color: #e9a8f5 !important; }
+.role-sel-일반    { background: #f3f4f6; color: #6b7280; border-color: #d1d5db !important; }
