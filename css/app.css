@@ -214,3 +214,8 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12p
   padding: 5px 7px; font-size: 12px; font-family: 'Noto Sans KR', sans-serif;
   background: var(--bg); color: var(--text); }
 .cedit:focus { outline: none; border-color: var(--teal); }
+
+/* 번역 대기 배지 */
+.nav-badge { display: inline-block; margin-left: 6px; background: var(--red); color: #fff;
+  font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; line-height: 18px;
+  border-radius: 9px; padding: 0 5px; text-align: center; vertical-align: middle; }

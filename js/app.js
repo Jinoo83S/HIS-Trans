@@ -193,6 +193,7 @@ async function loadInitialData(force) {
     APP.cache.loaded    = true;
 
     renderSubjectSelect();
+    updateTransBadge();
     toast('데이터 로드 완료 ✓', 'success');
   } catch(e) { hideLoading(); toast('오류: ' + e.message, 'error'); }
 }
@@ -542,6 +543,29 @@ function renderTable() {
   autoResizeAll();
 }
 
+// 번역 대기 배지 갱신 (원문 있고 최종본 없는 항목 수)
+function updateTransBadge() {
+  var badge = document.getElementById('transBadge');
+  if (!badge) return;
+
+  var count = 0;
+  var tm = APP.cache.transMap || {};
+  Object.keys(tm).forEach(function(key) {
+    var rec = tm[key];
+    // 원문(sourceText) 있고 최종본(finalText) 없으면 번역 대기
+    if (rec.sourceText && rec.sourceText.trim() && (!rec.finalText || !rec.finalText.trim())) {
+      count++;
+    }
+  });
+
+  if (count > 0) {
+    badge.textContent = count;
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
 // 모든 textarea 높이를 내용에 맞춤
 function autoResizeAll() {
   setTimeout(function() {
@@ -870,6 +894,7 @@ async function saveRow(i) {
           status:          row.status
         };
       }
+      updateTransBadge();
       refreshRow(i);
       toast('저장 완료 ✓', 'success');
     } else {
