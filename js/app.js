@@ -2136,39 +2136,63 @@ function buildStatusBadge(r, idx) {
     '<div style="font-size:9px;color:var(--gold);font-weight:700;margin-top:2px">● 미저장</div>';
 }
 
-function showNeisHelp() {
-  var overlay = document.getElementById('neisHelpOverlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'neisHelpOverlay';
-    overlay.className = 'overlay open';
-    overlay.innerHTML = `
-      <div class="modal" style="max-width:460px">
-        <button class="modal-x" onclick="document.getElementById('neisHelpOverlay').classList.remove('open')">×</button>
-        <h3>🔍 NEIS 검토 항목</h3>
-        <div style="margin-top:12px;font-size:12px;line-height:2;color:var(--text)">
-          <div style="padding:8px 12px;background:var(--bg3);border-radius:6px;margin-bottom:8px">
-            <b>📏 글자수</b> — 500자 초과 여부 확인
-          </div>
-          <div style="padding:8px 12px;background:var(--bg3);border-radius:6px;margin-bottom:8px">
-            <b>🚫 금칙 특수문자</b> — NEIS 입력 불가 문자<br>
-            <span style="font-family:monospace;color:var(--red)">&lt; &gt; { } [ ] \ | ^ ~ \`</span>
-          </div>
-          <div style="padding:8px 12px;background:var(--bg3);border-radius:6px;margin-bottom:8px">
-            <b>✍️ 문장 종결</b> — ~함. ~임. ~됨. ~있음. 등 권장
-          </div>
-          <div style="padding:8px 12px;background:var(--bg3);border-radius:6px">
-            <b>🔁 중복 표현</b> — 동일 단어 3회 이상 반복 감지
-          </div>
-        </div>
-        <div class="mfooter">
-          <button class="btn-save" onclick="document.getElementById('neisHelpOverlay').classList.remove('open')">확인</button>
-        </div>
-      </div>`;
-    document.body.appendChild(overlay);
-  } else {
-    overlay.classList.add('open');
+async function showNeisHelp() {
+  // 최신 검토 규칙 로드
+  var r = (APP.settings && APP.settings.neisRules) || {};
+  try {
+    var res = await API.getSettings();
+    if (res && res.success) { APP.settings = res.data; r = res.data.neisRules || {}; }
+  } catch(e) {}
+
+  var maxChars = r.maxChars != null ? r.maxChars : 500;
+  var forbidden = r.forbidden != null ? r.forbidden : '<>{}[]\\|^~`';
+  var endings = (r.endings || '함.,임.,됨.,있음.').split(',').map(function(x){return x.trim();}).filter(Boolean);
+  var dupTh = r.dupThreshold != null ? r.dupThreshold : 3;
+  var banned = (r.bannedWords || '').split(',').map(function(x){return x.trim();}).filter(Boolean);
+
+  var rows = '';
+  rows += '<div style="padding:8px 12px;background:var(--bg3);border-radius:6px;margin-bottom:8px">' +
+    '<b>📏 글자수</b> — ' + maxChars + '자 초과 여부 확인</div>';
+
+  var forbiddenDisp = Array.from(forbidden).filter(function(c){return c.trim();}).join(' ');
+  rows += '<div style="padding:8px 12px;background:var(--bg3);border-radius:6px;margin-bottom:8px">' +
+    '<b>🚫 금칙 특수문자</b> — NEIS 입력 불가 문자<br>' +
+    '<span style="font-family:monospace;color:var(--red)">' + e(forbiddenDisp) + '</span></div>';
+
+  if (r.checkEnding !== false) {
+    rows += '<div style="padding:8px 12px;background:var(--bg3);border-radius:6px;margin-bottom:8px">' +
+      '<b>✍️ 문장 종결</b> — ' + e(endings.join(' ')) + ' 등 권장</div>';
   }
+  if (r.checkDup !== false) {
+    rows += '<div style="padding:8px 12px;background:var(--bg3);border-radius:6px;margin-bottom:8px">' +
+      '<b>🔁 반복 표현</b> — 동일 단어 ' + dupTh + '회 이상 반복 감지</div>';
+  }
+  if (banned.length) {
+    rows += '<div style="padding:8px 12px;background:var(--bg3);border-radius:6px">' +
+      '<b>⛔ 금지 단어</b> — ' + e(banned.join(', ')) + '</div>';
+  }
+
+  // 기존 모달 제거 후 재생성 (항상 최신 반영)
+  var old = document.getElementById('neisHelpOverlay');
+  if (old) old.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'neisHelpOverlay';
+  overlay.className = 'overlay open';
+  function closeHelp() { overlay.classList.remove('open'); }
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:460px">' +
+      '<button class="modal-x" data-close="1">×</button>' +
+      '<h3>🔍 NEIS 검토 항목</h3>' +
+      '<div style="margin-top:12px;font-size:12px;line-height:2;color:var(--text)">' + rows + '</div>' +
+      '<div class="mfooter">' +
+        '<button class="btn-save" data-close="1">확인</button>' +
+      '</div>' +
+    '</div>';
+  overlay.querySelectorAll('[data-close]').forEach(function(b){
+    b.addEventListener('click', closeHelp);
+  });
+  document.body.appendChild(overlay);
 }
 
 function showApiKeyAlert(msg) {
