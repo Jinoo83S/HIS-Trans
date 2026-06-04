@@ -317,7 +317,7 @@ async function onSubjectChange() {
     showLoading('불러오는 중...');
     try {
       var [sRes, tRes] = await Promise.all([
-        API.getStudentsByCourse(subjectCode, isClub),
+        API.getStudentsByCourse(subjectCode, isClub, document.getElementById('selSem').value),
         API.getTransList({ year: document.getElementById('selYear').value,
                           semester: document.getElementById('selSem').value,
                           subjectCode: subjectCode })
@@ -447,7 +447,9 @@ async function pipelineRow(i) {
       targetLang: document.getElementById('selTgt').value,
       text: row.sourceText,
       studentName: row.student.name,
-      subjectName: APP.selectedSubject ? APP.selectedSubject.nameKR : ''
+      subjectName: APP.selectedSubject ? APP.selectedSubject.nameKR : '',
+      subjectCode: APP.selectedSubject ? APP.selectedSubject.subjectCode : '',
+      semester: document.getElementById('selSem').value
     });
     if (!res.success) {
       hideProgress();
@@ -503,7 +505,9 @@ async function pipelineAll() {
         targetLang: document.getElementById('selTgt').value,
         text: row.sourceText,
         studentName: row.student.name,
-        subjectName: APP.selectedSubject ? APP.selectedSubject.nameKR : ''
+        subjectName: APP.selectedSubject ? APP.selectedSubject.nameKR : '',
+      subjectCode: APP.selectedSubject ? APP.selectedSubject.subjectCode : '',
+      semester: document.getElementById('selSem').value
       });
       if (res.success) {
         if (res.translatedDraft) row.translatedDraft = res.translatedDraft;

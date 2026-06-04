@@ -54,7 +54,7 @@ var API = (function() {
     getMySubjects:      (semester)              => call('getMySubjects', { semester }),
     getAllSubjects:      (semester)              => call('getAllSubjects', { semester }),
     getReviewerSubjects:(semester)              => call('getReviewerSubjects', { semester }),
-    getStudentsByCourse:(subjectCode, isClub)   => call('getStudentsByCourse', { subjectCode, isClub }),
+    getStudentsByCourse:(subjectCode, isClub, semester) => call('getStudentsByCourse', { subjectCode, isClub, semester }),
 
     // 번역
     translate:          (payload)               => call('translate', { payload }),
