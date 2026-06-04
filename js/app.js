@@ -1825,14 +1825,17 @@ function showApiKeyAlert(msg) {
   document.getElementById('apiKeyAlertMsg').textContent = msg;
 }
 
-function openPromptModal() {
-  document.getElementById('promptText').value = APP.prompt;
+async function openPromptModal() {
+  // 최신 관리자 설정 로드
+  try {
+    var res = await API.getSettings();
+    if (res && res.success) APP.settings = res.data;
+  } catch(e) {}
+  var s = APP.settings || {};
+  document.getElementById('viewStep1').value = s.step1_prompt || '';
+  document.getElementById('viewStep2').value = s.step2_prompt || '';
+  document.getElementById('viewTerms').value = s.terms || '';
   document.getElementById('promptOverlay').classList.add('open');
-}
-function savePrompt() {
-  APP.prompt = document.getElementById('promptText').value;
-  closeModal('promptOverlay');
-  toast('프롬프트 저장 완료 ✓', 'success');
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 

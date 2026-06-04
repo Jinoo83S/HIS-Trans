@@ -207,17 +207,20 @@
 
 <!-- 프롬프트 모달 -->
 <div class="overlay" id="promptOverlay">
-  <div class="modal">
+  <div class="modal" style="max-width:720px">
     <button class="modal-x" onclick="closeModal('promptOverlay')">×</button>
-    <h3>✏️ 번역 프롬프트</h3>
-    <div class="frow">
-      <label class="flabel">시스템 프롬프트 (비우면 기본값 사용)</label>
-      <textarea class="finput ftarea" id="promptText" rows="6"
-        placeholder="You are an expert Korean school record translator..."></textarea>
-    </div>
+    <h3>✏️ 번역 프롬프트 <span style="font-size:12px;color:var(--gray);font-weight:400">(관리자 설정 · 읽기전용)</span></h3>
+    <div class="frow"><div class="flabel">STEP 1 프롬프트 (번역)</div>
+      <textarea class="finput ftarea" id="viewStep1" rows="6" readonly
+        style="background:#f8fafc;color:var(--text2)"></textarea></div>
+    <div class="frow"><div class="flabel">STEP 2 프롬프트 (세특 윤문)</div>
+      <textarea class="finput ftarea" id="viewStep2" rows="8" readonly
+        style="background:#f8fafc;color:var(--text2)"></textarea></div>
+    <div class="frow"><div class="flabel">용어 대조표</div>
+      <textarea class="finput ftarea" id="viewTerms" rows="4" readonly
+        style="background:#f8fafc;color:var(--text2)"></textarea></div>
     <div class="mfooter">
-      <button class="btn-cancel" onclick="closeModal('promptOverlay')">취소</button>
-      <button class="btn-save" onclick="savePrompt()">저장</button>
+      <button class="btn-save" onclick="closeModal('promptOverlay')">확인</button>
     </div>
   </div>
 </div>
