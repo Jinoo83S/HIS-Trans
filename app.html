@@ -183,6 +183,12 @@
     <div class="frow"><div class="flabel">우수 세특 예시 (여러 개는 빈 줄로 구분)</div>
       <textarea class="finput ftarea" id="setExamples" rows="10"
         placeholder="예시 1 내용...&#10;&#10;예시 2 내용..."></textarea></div>
+    <div class="frow">
+      <div class="flabel">번역 시 사용할 예시 개수 (토큰 절약)</div>
+      <input class="finput" id="setExampleLimit" type="number" min="0" max="10" value="2"
+        style="width:90px">
+      <span style="font-size:11px;color:var(--gray)">상위 N개만 AI에 전송됩니다. 적을수록 비용 절감.</span>
+    </div>
     <div class="mfooter">
       <button class="btn-cancel" onclick="closeModal('refOverlay')">취소</button>
       <button class="btn-save" onclick="saveRefModal()">저장</button>

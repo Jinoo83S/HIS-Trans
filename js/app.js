@@ -2100,18 +2100,22 @@ async function openRefModal() {
   var s = APP.settings || {};
   document.getElementById('setTerms').value = s.terms || '';
   document.getElementById('setExamples').value = (s.examples || []).join('\n\n');
+  document.getElementById('setExampleLimit').value = s.exampleLimit != null ? s.exampleLimit : 2;
   document.getElementById('refOverlay').classList.add('open');
 }
 
 async function saveRefModal() {
   var terms = document.getElementById('setTerms').value;
   var examplesRaw = document.getElementById('setExamples').value;
+  var exampleLimit = parseInt(document.getElementById('setExampleLimit').value);
+  if (isNaN(exampleLimit) || exampleLimit < 0) exampleLimit = 2;
   // 빈 줄 2개로 예시 분리
   var examples = examplesRaw.split(/\n\s*\n/).map(function(s){return s.trim();}).filter(Boolean);
   try {
-    var res = await API.saveSettings({ terms: terms, examples: examples });
+    var res = await API.saveSettings({ terms: terms, examples: examples, exampleLimit: exampleLimit });
     if (res.success) {
       toast('용어·예시 저장 완료 ✓', 'success');
+      if (APP.settings) { APP.settings.examples = examples; APP.settings.exampleLimit = exampleLimit; }
       closeModal('refOverlay');
       loadSettings();
     } else toast('저장 실패: ' + res.error, 'error');
