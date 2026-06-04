@@ -270,7 +270,8 @@ function countPendingBySubject(subjectCode) {
   Object.keys(tm).forEach(function(key) {
     if (key.indexOf(subjectCode + '|') !== 0) return; // subjectCode|studentName
     var rec = tm[key];
-    if (rec.sourceText && rec.sourceText.trim() && (!rec.finalText || !rec.finalText.trim())) n++;
+    // 원문 있고 아직 검수완료(reviewed)가 아니면 대기
+    if (rec.sourceText && rec.sourceText.trim() && rec.status !== 'reviewed') n++;
   });
   return n;
 }
@@ -445,6 +446,7 @@ async function pipelineRow(i) {
     if (res.translatedDraft) row.translatedDraft = res.translatedDraft;
     if (res.finalText) row.finalText = res.finalText;
     if (res.memo) row.comment = res.memo;
+    row.status = 'ai_draft';  // AI 생성 → 검수 전 상태
     row._dirty = true;
     refreshRow(i);
     setTimeout(hideProgress, 400);
@@ -483,6 +485,7 @@ async function pipelineAll() {
         if (res.translatedDraft) row.translatedDraft = res.translatedDraft;
         if (res.finalText) row.finalText = res.finalText;
         if (res.memo) row.comment = res.memo;
+        row.status = 'ai_draft';
         row._dirty = true;
         refreshRow(i);
       }
@@ -579,8 +582,8 @@ function updateTransBadge() {
   var tm = APP.cache.transMap || {};
   Object.keys(tm).forEach(function(key) {
     var rec = tm[key];
-    // 원문(sourceText) 있고 최종본(finalText) 없으면 번역 대기
-    if (rec.sourceText && rec.sourceText.trim() && (!rec.finalText || !rec.finalText.trim())) {
+    // 원문 있고 아직 검수완료가 아니면 대기
+    if (rec.sourceText && rec.sourceText.trim() && rec.status !== 'reviewed') {
       count++;
     }
   });
@@ -885,6 +888,16 @@ async function saveRow(i) {
 
   try {
     var res;
+    // 저장 시 상태 결정
+    // - 입력 탭(외국인 교사): 원문만 저장 → draft (최종본 없음)
+    // - 번역 탭(검수 교사)에서 사람이 저장: 최종본 있으면 reviewed (검수 완료)
+    var saveStatus;
+    if (APP.currentView === 'input') {
+      saveStatus = 'draft';
+    } else {
+      saveStatus = row.finalText ? 'reviewed' : 'draft';
+    }
+
     // 신규/수정 모두 새 행으로 추가 (기존 데이터 보존)
     var record = {
       year:         document.getElementById('selYear').value,
@@ -902,12 +915,13 @@ async function saveRow(i) {
       sourceText:      row.sourceText,
       translatedDraft: row.translatedDraft,
       finalText:       row.finalText,
-      reviewerComment: row.comment
+      reviewerComment: row.comment,
+      status:          saveStatus
     };
     res = await API.saveTrans(record);
     if (res && res.success) row.rowIndex = res.rowIndex;
     if (res && res.success) {
-      row.status = row.finalText ? 'reviewed' : 'draft';
+      row.status = saveStatus;
       row._dirty = false;
       // 캐시 갱신
       if (APP.selectedSubject) {
@@ -1810,17 +1824,28 @@ function resetUrl() {
 function buildStatusBadge(r, idx) {
   // 저장 안 됨
   if (!r.rowIndex) {
+    // AI 번역됐지만 아직 저장 안 함
+    if (r.status === 'ai_draft' && r.finalText) {
+      return '<span class="sbadge" style="background:#fef3c7;color:#92400e">AI초안</span>' +
+        '<div style="font-size:9px;color:var(--red);font-weight:700;margin-top:2px">● 미저장</div>';
+    }
     return '<div style="font-size:10px;font-weight:700;color:var(--red)">● 미저장</div>';
   }
   // 저장됨 + 미수정
   if (!r._dirty) {
     var label = r.status === 'reviewed' ? '검수완료'
+              : r.status === 'ai_draft' ? 'AI초안'
               : r.status === 'final'    ? '최종완료'
               : '저장됨';
     var cls   = r.status === 'reviewed' ? 's-reviewed'
               : r.status === 'final'    ? 's-final'
               : 's-draft';
-    var badge = '<span class="sbadge ' + cls + '">' + label + '</span>';
+    var style = r.status === 'ai_draft' ? ' style="background:#fef3c7;color:#92400e"' : '';
+    var badge = '<span class="sbadge ' + cls + '"' + style + '>' + label + '</span>';
+    // AI초안이면 "검수확정" 안내
+    if (r.status === 'ai_draft') {
+      badge += '<div style="font-size:9px;color:var(--gray);margin-top:2px">저장=검수확정</div>';
+    }
     // 검수완료/최종완료면 복사 버튼 노출
     if ((r.status === 'reviewed' || r.status === 'final') && idx !== undefined) {
       badge += '<button class="btn-cp" onclick="copyFinal(' + idx + ')" ' +
