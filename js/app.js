@@ -1576,6 +1576,55 @@ function renderAdminTab() {
   loadTeacherList();
 }
 
+// ── 관리자: 입력 데이터 초기화 ────────────────────────────────
+function openClearDataModal() {
+  document.getElementById('clearConfirm').value = '';
+  updateClearScopeInfo();
+  document.getElementById('clearMode').onchange = updateClearScopeInfo;
+  document.getElementById('clearDataOverlay').classList.add('open');
+}
+
+function updateClearScopeInfo() {
+  var mode = document.getElementById('clearMode').value;
+  var info = document.getElementById('clearScopeInfo');
+  if (mode === 'all') {
+    info.innerHTML = '⚠️ <b style="color:#dc2626">모든 학년도·학기의 번역 데이터</b>가 삭제됩니다.';
+  } else {
+    var y = document.getElementById('selYear').value;
+    var s = document.getElementById('selSem').value;
+    info.innerHTML = '→ <b>' + y + '년 ' + s + '학기</b> 데이터만 삭제됩니다.';
+  }
+}
+
+async function executeClearData() {
+  var mode = document.getElementById('clearMode').value;
+  var confirmText = document.getElementById('clearConfirm').value.trim();
+  if (confirmText !== '삭제') { toast('확인란에 "삭제"를 정확히 입력하세요.', 'error'); return; }
+
+  var filters = null;
+  if (mode === 'filter') {
+    filters = {
+      year:     document.getElementById('selYear').value,
+      semester: document.getElementById('selSem').value
+    };
+  }
+
+  try {
+    var res = await API.clearTransData(mode, filters);
+    if (res.success) {
+      toast(res.deleted + '건 삭제 완료 ✓', 'success');
+      closeModal('clearDataOverlay');
+      APP.cache.loaded = false; // 캐시 무효화
+      // 현재 보고 있던 데이터 비우기
+      APP.rows = [];
+      APP.cache.transMap = {};
+      updateTransBadge();
+    } else {
+      toast('삭제 실패: ' + res.error, 'error');
+    }
+  } catch(e) { toast(e.message, 'error'); }
+}
+
 // ── 관리자: 과목/동아리 편집 ──────────────────────────────────
 var _currData = [];
 

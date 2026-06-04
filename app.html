@@ -124,6 +124,7 @@
         <button class="btn-icon" onclick="openSettingsModal()">⚙️ 엔진·프롬프트</button>
         <button class="btn-icon" onclick="openRefModal()">📚 용어·예시</button>
         <button class="btn-icon" onclick="loadCurriculumList()">📖 과목·동아리 편집</button>
+        <button class="btn-icon" onclick="openClearDataModal()" style="border-color:#dc2626;color:#dc2626">🗑️ 입력 데이터 초기화</button>
       </div>
       <div id="teacherList"></div>
       <div id="curriculumList" style="margin-top:20px"></div>
@@ -183,6 +184,35 @@
     <div class="mfooter">
       <button class="btn-cancel" onclick="closeModal('refOverlay')">취소</button>
       <button class="btn-save" onclick="saveRefModal()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 입력 데이터 초기화 모달 -->
+<div class="overlay" id="clearDataOverlay">
+  <div class="modal" style="max-width:480px">
+    <button class="modal-x" onclick="closeModal('clearDataOverlay')">×</button>
+    <h3>🗑️ 입력 데이터 초기화</h3>
+    <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:10px 0">
+      번역 입력 데이터(Raw_Trans)를 삭제합니다.<br>
+      <b style="color:#dc2626">삭제된 데이터는 복구할 수 없습니다.</b><br>
+      교사·과목·설정은 삭제되지 않습니다.
+    </p>
+    <div class="frow">
+      <label class="flabel">삭제 범위</label>
+      <select class="finput" id="clearMode">
+        <option value="filter">현재 선택한 학년도·학기만</option>
+        <option value="all">전체 데이터</option>
+      </select>
+    </div>
+    <div id="clearScopeInfo" style="font-size:12px;color:var(--gray);margin:6px 0"></div>
+    <div class="frow">
+      <label class="flabel">확인을 위해 <b>삭제</b>를 입력하세요</label>
+      <input class="finput" id="clearConfirm" placeholder="삭제">
+    </div>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="closeModal('clearDataOverlay')">취소</button>
+      <button class="btn-save" onclick="executeClearData()" style="background:#dc2626">삭제 실행</button>
     </div>
   </div>
 </div>
