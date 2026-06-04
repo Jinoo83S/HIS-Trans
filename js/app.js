@@ -210,6 +210,12 @@ function renderSubjectSelect() {
 
   var isAdmin = APP.teacher && APP.teacher.role === '관리자';
 
+  // 과목별 번역 대기 건수 접미사
+  function pendingSuffix(subjectCode) {
+    var n = countPendingBySubject(subjectCode);
+    return n > 0 ? ' (번역대기 ' + n + ')' : '';
+  }
+
   // 관리자: 교사명 기준 정렬, 동일 교사면 학년 순
   if (isAdmin) {
     filtered.sort(function(a, b) {
@@ -243,7 +249,7 @@ function renderSubjectSelect() {
             ? ' [' + s.teachers.join(', ') + ']' : '';
           var gradePrefix = tab === '과목' ? 'G' + s.grade + ' | ' : '';
           return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
-            `${gradePrefix}${s.nameKR}${allTeachers}</option>`;
+            `${gradePrefix}${s.nameKR}${allTeachers}${pendingSuffix(s.subjectCode)}</option>`;
         }).join('');
         return `<optgroup label="👤 ${teacher}">${opts}</optgroup>`;
       }).join('');
@@ -252,9 +258,30 @@ function renderSubjectSelect() {
       (tab === '과목' ? '과목 선택' : '동아리 선택') + ' --</option>' +
       filtered.map(function(s) {
         return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
-          `${s.nameKR} / ${s.nameEN}</option>`;
+          `${s.nameKR} / ${s.nameEN}${pendingSuffix(s.subjectCode)}</option>`;
       }).join('');
   }
+}
+
+// 특정 과목의 번역 대기 건수 (원문 있고 최종본 없음)
+function countPendingBySubject(subjectCode) {
+  var tm = APP.cache.transMap || {};
+  var n = 0;
+  Object.keys(tm).forEach(function(key) {
+    if (key.indexOf(subjectCode + '|') !== 0) return; // subjectCode|studentName
+    var rec = tm[key];
+    if (rec.sourceText && rec.sourceText.trim() && (!rec.finalText || !rec.finalText.trim())) n++;
+  });
+  return n;
+}
+
+// 드롭다운 대기 건수만 갱신 (현재 선택 유지)
+function refreshSubjectDropdownCounts() {
+  var sel = document.getElementById('selSubject');
+  if (!sel) return;
+  var cur = sel.value;
+  renderSubjectSelect();
+  sel.value = cur;
 }
 
 async function onSubjectChange() {
@@ -895,6 +922,7 @@ async function saveRow(i) {
         };
       }
       updateTransBadge();
+      refreshSubjectDropdownCounts();
       refreshRow(i);
       toast('저장 완료 ✓', 'success');
     } else {
