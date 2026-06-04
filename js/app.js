@@ -405,10 +405,10 @@ async function onSubjectChange() {
       student:         s,
       sourceText:      saved.sourceText      || '',
       translatedDraft: saved.translatedDraft || '',
-      finalText:       saved.finalText       || saved.reviewedText || '',
+      finalText:       saved.finalText       || '',
       comment:         saved.reviewerComment || '',
       aiMemo:          saved.aiMemo          || '',
-      aiFinal:         saved.aiFinal         || '',
+      aiFinal:         saved.reviewedText    || '',  // U열 = AI 세특 원본(비교 기준)
       status:          saved.status          || 'draft',
       rowIndex:        saved.rowIndex        || null,
       translating:     false,
@@ -1121,6 +1121,7 @@ async function saveRow(i, opts) {
       sourceText:      row.sourceText,
       translatedDraft: row.translatedDraft,
       finalText:       row.finalText,
+      aiFinal:         row.aiFinal,
       reviewerComment: row.comment,
       status:          saveStatus
     };
@@ -1137,6 +1138,7 @@ async function saveRow(i, opts) {
           sourceText:      row.sourceText,
           translatedDraft: row.translatedDraft,
           finalText:       row.finalText,
+          reviewedText:    row.aiFinal,
           reviewerComment: row.comment,
           status:          row.status
         };
