@@ -103,14 +103,20 @@ function initUI() {
   if (canTranslate) document.getElementById('navTranslate').style.display = '';
   if (role === '관리자') document.getElementById('navAdmin').style.display = '';
 
-  // 학년도 옵션
+  // 학년도 기본값 (현재 연도)
   var now = new Date(), curY = now.getFullYear();
-  var ys = document.getElementById('selYear');
-  for (var y = curY; y >= curY - 3; y--) {
-    var o = document.createElement('option');
-    o.value = o.textContent = y; ys.appendChild(o);
-  }
+  document.getElementById('selYear').value = curY;
   document.getElementById('selSem').value = (now.getMonth() + 1) <= 7 ? '1' : '2';
+
+  // 학년도·학기 변경은 관리자만 (비관리자는 읽기전용)
+  if (t.role !== '관리자') {
+    document.getElementById('selYear').disabled = true;
+    document.getElementById('selSem').disabled  = true;
+    document.getElementById('selYear').style.opacity = '0.6';
+    document.getElementById('selSem').style.opacity  = '0.6';
+    document.getElementById('selYear').title = '학년도 변경은 관리자만 가능합니다';
+    document.getElementById('selSem').title  = '학기 변경은 관리자만 가능합니다';
+  }
 
   // 기본 뷰 결정
   var defaultView = canInput ? 'input' : (canTranslate ? 'translate' : 'admin');
@@ -419,6 +425,14 @@ async function onSubjectChange() {
 }
 
 function onFilterChange() {
+  // 학년도 유효성 검사
+  var yEl = document.getElementById('selYear');
+  var y = parseInt(yEl.value);
+  if (!y || y < 2020 || y > 2099) {
+    yEl.value = new Date().getFullYear();
+    toast('학년도는 2020~2099 범위로 입력하세요.', 'error');
+    return;
+  }
   APP.cache.loaded = false;
   _historyAll = null; // 연도/학기 변경 시 이력 전체 캐시 무효화
   loadSubjects();

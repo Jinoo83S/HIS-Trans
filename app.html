@@ -37,7 +37,8 @@
 <div id="toolbar">
   <div class="tb-row">
     <div class="ctrl-g trans-only"><span class="clabel">Year</span>
-      <select id="selYear" onchange="onFilterChange()"></select></div>
+      <input id="selYear" type="number" min="2020" max="2099" style="width:75px"
+        onchange="onFilterChange()"></div>
     <div class="ctrl-g trans-only"><span class="clabel">Sem.</span>
       <select id="selSem" onchange="onFilterChange()">
         <option value="1">1학기</option><option value="2">2학기</option>
