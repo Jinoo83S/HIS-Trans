@@ -661,20 +661,12 @@ function renderTable() {
   table.style.display = '';
   empty.style.display = 'none';
 
+  // 저장된 열 너비 적용 (없으면 기본값)
+  var defaultWidths = ['6%','4%','2.5%','2.5%','4%','21%','3%','21%','21%','3%','7%','3%','5%'];
+  var savedWidths = loadColWidths();
+  var widths = savedWidths || defaultWidths;
   var colsInfo = '<colgroup>' +
-    '<col style="width:6%">' +   // Name EN
-    '<col style="width:4%">' +   // 이름
-    '<col style="width:2.5%">' + // Gr.
-    '<col style="width:2.5%">' + // Cls.
-    '<col style="width:4%">' +   // NEIS
-    '<col style="width:21%">' +  // Source
-    '<col style="width:3%">' +   // 번역
-    '<col style="width:21%">' +  // 번역 초본
-    '<col style="width:21%">' +  // 최종본
-    '<col style="width:3%">' +   // 검토
-    '<col style="width:7%">' +   // 검수 코멘트
-    '<col style="width:3%">' +   // 글자수
-    '<col style="width:5%">' +   // 상태
+    widths.map(function(w){ return '<col style="width:' + w + '">'; }).join('') +
     '</colgroup>';
 
   // colgroup을 테이블에 삽입
@@ -701,9 +693,71 @@ function renderTable() {
 
   body.innerHTML = APP.rows.map((r, i) => rowHtml(r, i, role)).join('');
   autoResizeAll();
+  setupColumnResize();
 }
 
-// 번역 대기 배지 갱신 (원문 있고 최종본 없는 항목 수)
+// ── 열 너비 조절 (localStorage 저장) ──────────────────────────
+var COLW_KEY = 'his_col_widths';
+
+function loadColWidths() {
+  try {
+    var s = localStorage.getItem(COLW_KEY);
+    if (!s) return null;
+    var arr = JSON.parse(s);
+    return Array.isArray(arr) && arr.length === 13 ? arr : null;
+  } catch(e) { return null; }
+}
+
+function saveColWidths(widths) {
+  try { localStorage.setItem(COLW_KEY, JSON.stringify(widths)); } catch(e) {}
+}
+
+function setupColumnResize() {
+  var table = document.getElementById('mainTable');
+  if (!table) return;
+  var ths = table.querySelectorAll('thead th');
+  var cols = table.querySelectorAll('colgroup col');
+  if (!ths.length || !cols.length) return;
+
+  ths.forEach(function(th, idx) {
+    if (idx >= cols.length - 1) return; // 마지막 열은 핸들 없음
+    // 기존 핸들 제거
+    var old = th.querySelector('.col-resizer');
+    if (old) old.remove();
+    th.style.position = 'relative';
+    th.style.overflow = 'visible';
+
+    var handle = document.createElement('div');
+    handle.className = 'col-resizer';
+    th.appendChild(handle);
+
+    handle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var startX = e.pageX;
+      var tableWidth = table.offsetWidth;
+      var startW = th.offsetWidth;
+
+      function onMove(ev) {
+        var delta = ev.pageX - startX;
+        var newPx = Math.max(30, startW + delta);
+        var newPct = (newPx / tableWidth * 100).toFixed(2) + '%';
+        cols[idx].style.width = newPct;
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        // 현재 모든 col 너비 저장
+        var widths = Array.from(cols).map(function(c){ return c.style.width; });
+        saveColWidths(widths);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+}
+
+// 번역 대기 배지 갱신
 function updateTransBadge() {
   var badge = document.getElementById('transBadge');
   if (badge) {
@@ -755,18 +809,19 @@ function rowHtml(r, i, role) {
   var txt = r.finalText || r.translatedDraft || '';
   var cc = txt.length;
   var ccCls = cc === 0 ? '' : cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
-  // AI가 생성한 세특 원본(aiFinal) 대비 검수교사가 직접 수정한 부분 하이라이트
-  var finalDiff = (r.finalText && r.aiFinal && r.finalText !== r.aiFinal)
-    ? buildFinalDiffHtml(r.aiFinal, r.finalText) : '';
+  // AI 세특 원본 대비 수정 부분 하이라이트 (최종본 있으면 항상 표시)
+  // aiFinal 없으면(저장 후 재로드 등) 전체를 파란색으로
+  var diffBase = r.aiFinal || r.finalText;
+  var finalDiff = r.finalText ? buildFinalDiffHtml(diffBase, r.finalText) : '';
 
   return `<tr id="row_${i}">
-    <td><div class="ci" style="font-size:11px">${e(s.engName||'-')}</div></td>
-    <td><div class="ci" style="font-size:11px">${e(s.name)}</div></td>
-    <td><div class="ci">${s.grade}</div></td>
-    <td><div class="ci">${s.class}</div></td>
-    <td><div class="ci ci-neis">${e(s.neis||s.neisClass||'')}</div></td>
+    <td class="col-info"><div class="ci" style="font-size:11px">${e(s.engName||'-')}</div></td>
+    <td class="col-info"><div class="ci" style="font-size:11px">${e(s.name)}</div></td>
+    <td class="col-info"><div class="ci">${s.grade}</div></td>
+    <td class="col-info"><div class="ci">${s.class}</div></td>
+    <td class="col-info"><div class="ci ci-neis">${e(s.neis||s.neisClass||'')}</div></td>
     <td><textarea class="cta src" readonly
-      style="background:#f8fafc;color:var(--text2)">${e(r.sourceText)}</textarea></td>
+      style="color:var(--text2)">${e(r.sourceText)}</textarea></td>
     <td class="ca">
       <button class="btn-arrow" onclick="pipelineRow(${i})" title="번역"
         ${r.translating?'disabled':''} style="font-size:16px;background:none;border:none;
@@ -776,16 +831,16 @@ function rowHtml(r, i, role) {
         ${r.translating ? '⏳' : '▶'}
       </button>
     </td>
-    <td>
+    <td class="col-draft">
       <textarea class="cta drft" readonly id="drft_${i}"
-        style="background:#f8fafc;color:var(--text2)">${e(r.translatedDraft)}</textarea>
+        style="color:var(--text2)">${e(r.translatedDraft)}</textarea>
       <div class="ai-memo" id="amemo_${i}"
         style="${r.aiMemo && r.aiMemo!=='해당 없음' ? '' : 'display:none'};
         margin-top:4px;padding:6px;font-size:10px;line-height:1.5;
         background:#fef9c3;border:1px solid #fde047;border-radius:4px;
         color:#854d0e;white-space:pre-wrap">📌 ${e(r.aiMemo)}</div>
     </td>
-    <td>
+    <td class="col-final">
       <textarea class="cta fnl" id="fnl_${i}" oninput="onFinalChange(${i},this.value);autoResize(this)">${e(r.finalText)}</textarea>
       <div class="final-diff" id="fdiff_${i}"
         style="${finalDiff?'':'display:none'};padding:6px 6px;font-size:11px;line-height:1.6;
@@ -801,15 +856,15 @@ function rowHtml(r, i, role) {
         onmouseover="this.style.transform='scale(1.3)'"
         onmouseout="this.style.transform='scale(1)'">🔍</button>
     </td>
-    <td><div class="cta cmt" id="neis_cmt_${i}"
+    <td class="col-cmt"><div class="cta cmt" id="neis_cmt_${i}"
       style="min-height:76px;padding:7px 9px;font-size:11px;
-      color:var(--text2);background:#fafafa;white-space:pre-wrap">${e(r.comment)}</div></td>
+      color:var(--text2);white-space:pre-wrap">${e(r.comment)}</div></td>
     <td><div class="cc ${ccCls}">
       ${cc>0 ? '<span style="font-size:9px;color:var(--gray);display:block">' +
         (document.getElementById('selSem')?.value==='1'?'1학기':'2학기') +
         '</span>' + cc + '/500' : '-'}
     </div></td>
-    <td><div class="ci" style="padding:4px 2px">
+    <td class="col-status"><div class="ci" style="padding:4px 2px">
       ${buildStatusBadge(r, i)}
       <button class="btn-cp" onclick="saveRow(${i})"
         style="margin-top:5px;width:100%;
@@ -864,18 +919,13 @@ function onFinalChange(i, val) {
   updateCC(i);
   // AI 생성 세특 원본(aiFinal) 대비 직접 수정한 부분 하이라이트
   var fdiffEl = document.getElementById('fdiff_' + i);
-  var base    = APP.rows[i].aiFinal;
-  if (fdiffEl && base) {
-    if (val && val !== base) {
-      fdiffEl.innerHTML =
-        '<div style="font-size:9px;color:var(--gray);margin-bottom:3px">🟦 AI번역 · 🟩 직접추가 · <span style="text-decoration:line-through;color:#dc2626">삭제</span></div>' +
-        buildFinalDiffHtml(base, val);
-      fdiffEl.style.display = '';
-    } else {
-      fdiffEl.style.display = 'none';
-    }
+  var base    = APP.rows[i].aiFinal || val;
+  if (fdiffEl && val) {
+    fdiffEl.innerHTML =
+      '<div style="font-size:9px;color:var(--gray);margin-bottom:3px">🟦 AI번역 · 🟩 직접추가 · <span style="text-decoration:line-through;color:#dc2626">삭제</span></div>' +
+      buildFinalDiffHtml(base, val);
+    fdiffEl.style.display = '';
   } else if (fdiffEl) {
-    // aiFinal 기준이 없으면(수동 입력 등) 비교 미표시
     fdiffEl.style.display = 'none';
   }
 }
