@@ -265,13 +265,26 @@ function renderSubjectSelect() {
 
 // 특정 과목의 번역 대기 건수 (원문 있고 최종본 없음)
 function countPendingBySubject(subjectCode) {
+  var code = String(subjectCode);
+
+  // 현재 선택된 과목이면 화면 데이터(APP.rows)로 정확히 계산
+  if (APP.selectedSubject && String(APP.selectedSubject.subjectCode) === code && APP.rows.length) {
+    var c = 0;
+    APP.rows.forEach(function(r) {
+      if (r.sourceText && String(r.sourceText).trim() && r.status !== 'reviewed') c++;
+    });
+    return c;
+  }
+
+  // 그 외 과목은 캐시 transMap으로 계산
   var tm = APP.cache.transMap || {};
   var n = 0;
   Object.keys(tm).forEach(function(key) {
-    if (key.indexOf(subjectCode + '|') !== 0) return; // subjectCode|studentName
+    var sep = key.indexOf('|');
+    if (sep === -1) return;
+    if (key.substring(0, sep) !== code) return;
     var rec = tm[key];
-    // 원문 있고 아직 검수완료(reviewed)가 아니면 대기
-    if (rec.sourceText && rec.sourceText.trim() && rec.status !== 'reviewed') n++;
+    if (rec.sourceText && String(rec.sourceText).trim() && rec.status !== 'reviewed') n++;
   });
   return n;
 }
