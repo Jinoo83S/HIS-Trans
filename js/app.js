@@ -79,7 +79,12 @@ window.addEventListener('resize', relayout);
 
 function initUI() {
   var t = APP.teacher;
-  document.getElementById('tName').textContent = t.name + ' / ' + t.fullName;
+  var nameLabel = t.name + ' / ' + t.fullName;
+  // 검수 교사면 담당 번역 교사 표시
+  if (t.role === '검수' && t.assignedTo) {
+    nameLabel += ' (검수 담당: ' + t.assignedTo + ')';
+  }
+  document.getElementById('tName').textContent = nameLabel;
   var rb = document.getElementById('rBadge');
   rb.textContent = t.role;
   rb.className = 'role-badge role-' + t.role;
