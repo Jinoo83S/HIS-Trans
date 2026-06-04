@@ -84,6 +84,12 @@ function initUI() {
   rb.textContent = t.role;
   rb.className = 'role-badge role-' + t.role;
 
+  // GAS URL 고정 모드면 URL 변경 버튼 숨김
+  if (Config.isLocked && Config.isLocked()) {
+    var btnUrl = document.getElementById('btnUrl');
+    if (btnUrl) btnUrl.style.display = 'none';
+  }
+
   // 권한별 탭 표시
   var role = t.role;
   var canInput     = (role === '번역' || role === '관리자');

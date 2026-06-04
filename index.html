@@ -121,7 +121,7 @@ body::before { content: ''; position: fixed; inset: 0;
     <div class="error" id="err"></div>
     <div class="divider"></div>
     <div class="note">비밀번호는 휴대폰 번호 뒷 4자리입니다.<br>Password is the last 4 digits of your phone number.</div>
-    <button class="url-btn" onclick="openUrlModal()">🔗 Web App URL 설정</button>
+    <button class="url-btn" id="idxUrlBtn" onclick="openUrlModal()">🔗 Web App URL 설정</button>
   </div>
 </div>
 
@@ -149,6 +149,11 @@ body::before { content: ''; position: fixed; inset: 0;
 <script>
   // 이미 로그인 상태면 앱으로
   window.onload = function() {
+    // GAS URL 고정 모드면 URL 설정 버튼 숨김
+    if (Config.isLocked && Config.isLocked()) {
+      var b = document.getElementById('idxUrlBtn');
+      if (b) b.style.display = 'none';
+    }
     if (!Config.isSet()) {
       openUrlModal();
       return;
