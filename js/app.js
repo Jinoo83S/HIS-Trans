@@ -357,6 +357,7 @@ async function onSubjectChange() {
       translatedDraft: saved.translatedDraft || '',
       finalText:       saved.finalText       || saved.reviewedText || '',
       comment:         saved.reviewerComment || '',
+      aiMemo:          saved.aiMemo          || '',
       status:          saved.status          || 'draft',
       rowIndex:        saved.rowIndex        || null,
       translating:     false,
@@ -466,7 +467,7 @@ async function pipelineRow(i) {
     setProgress(100, '완료', row.student.name);
     if (res.translatedDraft) row.translatedDraft = res.translatedDraft;
     if (res.finalText) row.finalText = res.finalText;
-    if (res.memo) row.comment = res.memo;
+    if (res.memo) row.aiMemo = res.memo;
     row.status = 'ai_draft';  // AI 생성 → 검수 전 상태
     row._dirty = true;
     refreshRow(i);
@@ -518,7 +519,7 @@ async function pipelineAll() {
       if (res.success) {
         if (res.translatedDraft) row.translatedDraft = res.translatedDraft;
         if (res.finalText) row.finalText = res.finalText;
-        if (res.memo) row.comment = res.memo;
+        if (res.memo) row.aiMemo = res.memo;
         row.status = 'ai_draft';
         row._dirty = true;
         refreshRow(i);
@@ -640,7 +641,7 @@ function renderTable() {
     '<th class="tht">번역 초본</th>' +
     '<th class="thf">최종본</th>' +
     '<th>검토</th>' +
-    '<th>검수 코멘트 <button type="button" onclick="showNeisHelp()" ' +
+    '<th>NEIS 검토 <button type="button" onclick="showNeisHelp()" ' +
       'style="background:var(--teal);color:#fff;border:none;border-radius:50%;' +
       'width:16px;height:16px;font-size:10px;cursor:pointer;font-weight:700;' +
       'line-height:16px;padding:0;vertical-align:middle">?</button></th>' +
@@ -715,6 +716,11 @@ function rowHtml(r, i, role) {
     <td>
       <textarea class="cta drft" readonly id="drft_${i}"
         style="background:#f8fafc;color:var(--text2)">${e(r.translatedDraft)}</textarea>
+      <div class="ai-memo" id="amemo_${i}"
+        style="${r.aiMemo && r.aiMemo!=='해당 없음' ? '' : 'display:none'};
+        margin-top:4px;padding:6px;font-size:10px;line-height:1.5;
+        background:#fef9c3;border:1px solid #fde047;border-radius:4px;
+        color:#854d0e;white-space:pre-wrap">📌 ${e(r.aiMemo)}</div>
     </td>
     <td>
       <textarea class="cta fnl" id="fnl_${i}" oninput="onFinalChange(${i},this.value);autoResize(this)">${e(r.finalText)}</textarea>

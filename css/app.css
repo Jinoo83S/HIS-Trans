@@ -119,7 +119,6 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance
 .cta.drft { background: #f8fafc; }
 .cta.fnl  { background: #f0fdf4; }
 .cta.cmt  { font-size: 11px; color: var(--gray); background: #fafafa; }
-.sheet tbody td { vertical-align: top; }
 .ca { padding: 6px; text-align: center; background: #f8fafc; vertical-align: top; }
 .btn-tr { background: var(--teal); color: #fff; border: none; border-radius: 4px;
   font-size: 11px; font-weight: 700; padding: 5px 8px; cursor: pointer; width: 100%;
