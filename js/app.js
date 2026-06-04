@@ -408,6 +408,7 @@ async function onSubjectChange() {
       finalText:       saved.finalText       || saved.reviewedText || '',
       comment:         saved.reviewerComment || '',
       aiMemo:          saved.aiMemo          || '',
+      aiFinal:         saved.aiFinal         || '',
       status:          saved.status          || 'draft',
       rowIndex:        saved.rowIndex        || null,
       translating:     false,
@@ -516,7 +517,7 @@ async function pipelineRow(i) {
     }
     setProgress(100, '완료', row.student.name);
     if (res.translatedDraft) row.translatedDraft = res.translatedDraft;
-    if (res.finalText) row.finalText = res.finalText;
+    if (res.finalText) { row.finalText = res.finalText; row.aiFinal = res.finalText; }
     if (res.memo) row.aiMemo = res.memo;
     row.status = 'ai_draft';  // AI 생성 → 검수 전 상태
     row._dirty = true;
@@ -568,7 +569,7 @@ async function pipelineAll() {
       });
       if (res.success) {
         if (res.translatedDraft) row.translatedDraft = res.translatedDraft;
-        if (res.finalText) row.finalText = res.finalText;
+        if (res.finalText) { row.finalText = res.finalText; row.aiFinal = res.finalText; }
         if (res.memo) row.aiMemo = res.memo;
         row.status = 'ai_draft';
         row._dirty = true;
@@ -754,9 +755,9 @@ function rowHtml(r, i, role) {
   var txt = r.finalText || r.translatedDraft || '';
   var cc = txt.length;
   var ccCls = cc === 0 ? '' : cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
-  // 최종본에서 AI원본(translatedDraft) 대비 직접 수정한 부분 하이라이트
-  var finalDiff = (r.finalText && r.translatedDraft && r.finalText !== r.translatedDraft)
-    ? buildFinalDiffHtml(r.translatedDraft, r.finalText) : '';
+  // AI가 생성한 세특 원본(aiFinal) 대비 검수교사가 직접 수정한 부분 하이라이트
+  var finalDiff = (r.finalText && r.aiFinal && r.finalText !== r.aiFinal)
+    ? buildFinalDiffHtml(r.aiFinal, r.finalText) : '';
 
   return `<tr id="row_${i}">
     <td><div class="ci" style="font-size:11px">${e(s.engName||'-')}</div></td>
@@ -861,18 +862,21 @@ function onFinalChange(i, val) {
   APP.rows[i].finalText = val;
   markDirty(i);
   updateCC(i);
-  // 최종본에서 AI원본 대비 직접 수정한 부분 하이라이트 (최종본 칸 아래 미리보기)
+  // AI 생성 세특 원본(aiFinal) 대비 직접 수정한 부분 하이라이트
   var fdiffEl = document.getElementById('fdiff_' + i);
-  var draft   = APP.rows[i].translatedDraft;
-  if (fdiffEl && draft) {
-    if (val && val !== draft) {
+  var base    = APP.rows[i].aiFinal;
+  if (fdiffEl && base) {
+    if (val && val !== base) {
       fdiffEl.innerHTML =
         '<div style="font-size:9px;color:var(--gray);margin-bottom:3px">🟦 AI번역 · 🟩 직접추가 · <span style="text-decoration:line-through;color:#dc2626">삭제</span></div>' +
-        buildFinalDiffHtml(draft, val);
+        buildFinalDiffHtml(base, val);
       fdiffEl.style.display = '';
     } else {
       fdiffEl.style.display = 'none';
     }
+  } else if (fdiffEl) {
+    // aiFinal 기준이 없으면(수동 입력 등) 비교 미표시
+    fdiffEl.style.display = 'none';
   }
 }
 function updateCC(i) {
