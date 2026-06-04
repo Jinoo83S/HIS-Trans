@@ -2133,14 +2133,38 @@ async function checkApiKeysStatus() {
     if (res.success) {
       var d = res.data;
       var el = document.getElementById('apiKeyStatus');
-      if (el) el.innerHTML =
-        '<div style="margin-top:10px;padding:10px;background:var(--bg3);border-radius:6px;font-size:11px;line-height:1.8">' +
-        '<b>저장 상태:</b><br>' +
-        'OpenAI: ' + e(d.openai) + '<br>' +
-        'Anthropic: ' + e(d.anthropic) + '<br>' +
-        'Gemini: ' + e(d.gemini) + '</div>';
+      if (!el) return;
+
+      function row(label, val, which) {
+        var hasKey = val && val !== '(없음)';
+        var delBtn = hasKey
+          ? '<button class="btn-cp" onclick="deleteApiKeyConfirm(\'' + which + '\',\'' + label + '\')" ' +
+            'style="background:#fee2e2;border-color:#fca5a5;color:var(--red);padding:2px 8px;font-size:10px">삭제</button>'
+          : '';
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0">' +
+          '<span>' + label + ': ' + e(val) + '</span>' + delBtn + '</div>';
+      }
+
+      el.innerHTML =
+        '<div style="margin-top:10px;padding:10px;background:var(--bg3);border-radius:6px;font-size:11px;line-height:1.6">' +
+        '<b>저장 상태:</b>' +
+        row('OpenAI', d.openai, 'openai') +
+        row('Anthropic', d.anthropic, 'anthropic') +
+        row('Gemini', d.gemini, 'gemini') +
+        '</div>';
     }
   } catch(err) {}
+}
+
+async function deleteApiKeyConfirm(which, label) {
+  if (!confirm(label + ' API 키를 삭제하시겠습니까?')) return;
+  try {
+    var res = await API.deleteApiKey(which);
+    if (res.success) {
+      toast(label + ' 키 삭제 완료 ✓', 'success');
+      checkApiKeysStatus();
+    } else toast('삭제 실패: ' + res.error, 'error');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ── URL 모달 ─────────────────────────────────────────────────
