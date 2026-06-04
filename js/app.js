@@ -681,9 +681,9 @@ function rowHtml(r, i, role) {
   var txt = r.finalText || r.translatedDraft || '';
   var cc = txt.length;
   var ccCls = cc === 0 ? '' : cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
-  // 번역초본 vs 최종본 diff 하이라이트 HTML
-  var diffHtml = r.finalText && r.translatedDraft
-    ? buildDiffHtml(r.translatedDraft, r.finalText) : '';
+  // 최종본에서 AI원본(translatedDraft) 대비 직접 수정한 부분 하이라이트
+  var finalDiff = (r.finalText && r.translatedDraft && r.finalText !== r.translatedDraft)
+    ? buildFinalDiffHtml(r.translatedDraft, r.finalText) : '';
 
   return `<tr id="row_${i}">
     <td><div class="ci" style="font-size:11px">${e(s.engName||'-')}</div></td>
@@ -691,8 +691,8 @@ function rowHtml(r, i, role) {
     <td><div class="ci">${s.grade}</div></td>
     <td><div class="ci">${s.class}</div></td>
     <td><div class="ci ci-neis">${e(s.neis||s.neisClass||'')}</div></td>
-    <td><textarea class="cta src" oninput="APP.rows[${i}].sourceText=this.value;markDirty(${i});autoResize(this)"
-      >${e(r.sourceText)}</textarea></td>
+    <td><textarea class="cta src" readonly
+      style="background:#f8fafc;color:var(--text2)">${e(r.sourceText)}</textarea></td>
     <td class="ca">
       <button class="btn-arrow" onclick="pipelineRow(${i})" title="번역"
         ${r.translating?'disabled':''} style="font-size:16px;background:none;border:none;
@@ -704,14 +704,16 @@ function rowHtml(r, i, role) {
     </td>
     <td>
       <textarea class="cta drft" readonly id="drft_${i}"
-        style="background:#f8fafc;color:var(--text2);${diffHtml?'display:none':''}">${e(r.translatedDraft)}</textarea>
-      <div class="diff-box" id="diff_${i}"
-        style="${diffHtml?'':'display:none'};min-height:76px;padding:7px 6px;
-        font-size:12px;line-height:1.6;word-break:break-word;background:#f8fafc;
-        border:none">${diffHtml}</div>
+        style="background:#f8fafc;color:var(--text2)">${e(r.translatedDraft)}</textarea>
     </td>
     <td>
       <textarea class="cta fnl" id="fnl_${i}" oninput="onFinalChange(${i},this.value);autoResize(this)">${e(r.finalText)}</textarea>
+      <div class="final-diff" id="fdiff_${i}"
+        style="${finalDiff?'':'display:none'};padding:6px 6px;font-size:11px;line-height:1.6;
+        word-break:break-word;background:#fffdf5;border-top:1px dashed #fbbf24">
+        <div style="font-size:9px;color:var(--gray);margin-bottom:3px">🟦 AI번역 · 🟩 직접수정</div>
+        ${finalDiff}
+      </div>
     </td>
     <td class="ca">
       <button class="btn-arrow" onclick="runNeisCheck(${i})" title="NEIS 검토"
@@ -781,18 +783,17 @@ function onFinalChange(i, val) {
   APP.rows[i].finalText = val;
   markDirty(i);
   updateCC(i);
-  // diff 하이라이트 - 번역 초본 td에 표시
-  var diffEl  = document.getElementById('diff_' + i);
-  var drftEl  = document.getElementById('drft_' + i);
-  if (diffEl && APP.rows[i].translatedDraft) {
-    var html = buildDiffHtml(APP.rows[i].translatedDraft, val);
-    if (html) {
-      diffEl.innerHTML = html;
-      diffEl.style.display = '';
-      if (drftEl) drftEl.style.display = 'none';
+  // 최종본에서 AI원본 대비 직접 수정한 부분 하이라이트 (최종본 칸 아래 미리보기)
+  var fdiffEl = document.getElementById('fdiff_' + i);
+  var draft   = APP.rows[i].translatedDraft;
+  if (fdiffEl && draft) {
+    if (val && val !== draft) {
+      fdiffEl.innerHTML =
+        '<div style="font-size:9px;color:var(--gray);margin-bottom:3px">🟦 AI번역 · 🟩 직접수정</div>' +
+        buildFinalDiffHtml(draft, val);
+      fdiffEl.style.display = '';
     } else {
-      diffEl.style.display = 'none';
-      if (drftEl) drftEl.style.display = '';
+      fdiffEl.style.display = 'none';
     }
   }
 }
@@ -1119,24 +1120,36 @@ function downloadExcel() {
 }
 
 // ── NEIS 검토 ────────────────────────────────────────────────
-// ── 단어 단위 diff ────────────────────────────────────────────
-function buildDiffHtml(original, modified) {
-  if (!original || !modified || original === modified) return '';
-  var a = original.split('');
-  var b = modified.split('');
-  // 간단한 문자 단위 diff: 변경된 부분 하이라이트
-  var result = '';
-  var maxLen = Math.max(a.length, b.length);
-  var changed = false;
-  for (var i = 0; i < b.length; i++) {
-    if (a[i] === b[i]) {
-      result += e(b[i]);
-    } else {
-      result += '<mark style="background:#fef08a;border-radius:2px">' + e(b[i]) + '</mark>';
-      changed = true;
+// 최종본 단어 단위 diff: AI원본과 같은 부분=파랑, 수정/추가=초록
+function buildFinalDiffHtml(aiDraft, finalText) {
+  if (!aiDraft || !finalText) return e(finalText || '');
+  // 단어(공백 포함) 단위 토큰화
+  var a = aiDraft.split(/(\s+)/);
+  var b = finalText.split(/(\s+)/);
+
+  // LCS 테이블
+  var n = a.length, m = b.length;
+  var dp = [];
+  for (var i = 0; i <= n; i++) dp[i] = new Array(m + 1).fill(0);
+  for (var i = n - 1; i >= 0; i--) {
+    for (var j = m - 1; j >= 0; j--) {
+      dp[i][j] = (a[i] === b[j]) ? dp[i+1][j+1] + 1 : Math.max(dp[i+1][j], dp[i][j+1]);
     }
   }
-  return changed ? result : '';
+  // b 기준으로 재구성: 공통=파랑, b에만 있음(추가/수정)=초록
+  var out = '', i2 = 0, j2 = 0;
+  function blue(t){ return '<span style="color:#2563eb">' + e(t) + '</span>'; }
+  function green(t){ return '<span style="color:#16a34a;font-weight:600;background:#dcfce7;border-radius:2px">' + e(t) + '</span>'; }
+  while (j2 < m) {
+    if (i2 < n && a[i2] === b[j2]) {       // 공통
+      out += blue(b[j2]); i2++; j2++;
+    } else if (i2 < n && dp[i2+1][j2] >= dp[i2][j2+1]) {
+      i2++;                                 // AI에만 있던 단어 삭제됨 → 표시 안 함
+    } else {
+      out += green(b[j2]); j2++;            // 최종본에만 있는 단어 = 직접 작성
+    }
+  }
+  return out;
 }
 
 async function runNeisCheck(i) {
