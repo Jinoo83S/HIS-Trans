@@ -221,8 +221,13 @@ function renderSubjectSelect() {
 
   var isAdmin = APP.teacher && APP.teacher.role === '관리자';
 
-  // 과목별 번역 대기 건수 접두사 (과목명 앞)
-  function pendingPrefix(subjectCode) {
+  // 과목별 접두사 (과목명 앞)
+  // 입력 탭: 미입력 학생 수(🟡), 번역 탭: 번역 대기 수(🔴)
+  function pendingPrefix(subjectCode, isClub) {
+    if (APP.currentView === 'input') {
+      var miss = countMissingInput(subjectCode, isClub);
+      return miss > 0 ? '🟡' + miss + ' ' : '';
+    }
     var n = countPendingBySubject(subjectCode);
     return n > 0 ? '🔴' + n + ' ' : '';
   }
@@ -260,7 +265,7 @@ function renderSubjectSelect() {
             ? ' [' + s.teachers.join(', ') + ']' : '';
           var gradePrefix = tab === '과목' ? 'G' + s.grade + ' | ' : '';
           return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
-            `${pendingPrefix(s.subjectCode)}${gradePrefix}${s.nameKR}${allTeachers}</option>`;
+            `${pendingPrefix(s.subjectCode, tab==='동아리')}${gradePrefix}${s.nameKR}${allTeachers}</option>`;
         }).join('');
         return `<optgroup label="👤 ${teacher}">${opts}</optgroup>`;
       }).join('');
@@ -269,9 +274,49 @@ function renderSubjectSelect() {
       (tab === '과목' ? '과목 선택' : '동아리 선택') + ' --</option>' +
       filtered.map(function(s) {
         return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
-          `${pendingPrefix(s.subjectCode)}${s.nameKR} / ${s.nameEN}</option>`;
+          `${pendingPrefix(s.subjectCode, tab==='동아리')}${s.nameKR} / ${s.nameEN}</option>`;
       }).join('');
   }
+}
+
+// 특정 과목의 번역 대기 건수 (원문 있고 최종본 없음)
+function countMissingInput(subjectCode, isClub) {
+  var code = String(subjectCode);
+
+  // 전체 학생 목록 (캐시)
+  var students = isClub
+    ? (APP.cache.clubMap[code] || [])
+    : (APP.cache.courseMap[code] || []);
+  if (!students.length) return 0;
+
+  // 현재 선택된 과목이면 화면 데이터로 정확히 계산
+  if (APP.selectedSubject && String(APP.selectedSubject.subjectCode) === code && APP.rows.length) {
+    var c = 0;
+    APP.rows.forEach(function(r) {
+      if (!r.sourceText || !String(r.sourceText).trim()) c++;
+    });
+    return c;
+  }
+
+  // 캐시 transMap에서 원문 입력된 학생 집합
+  var tm = APP.cache.transMap || {};
+  var entered = {};
+  Object.keys(tm).forEach(function(key) {
+    var sep = key.indexOf('|');
+    if (sep === -1) return;
+    if (key.substring(0, sep) !== code) return;
+    var rec = tm[key];
+    if (rec.sourceText && String(rec.sourceText).trim()) {
+      entered[key.substring(sep + 1)] = true; // 학생명
+    }
+  });
+
+  // 전체 학생 중 미입력 수
+  var miss = 0;
+  students.forEach(function(s) {
+    if (!entered[s.name]) miss++;
+  });
+  return miss;
 }
 
 // 특정 과목의 번역 대기 건수 (원문 있고 최종본 없음)
@@ -660,20 +705,32 @@ function renderTable() {
 // 번역 대기 배지 갱신 (원문 있고 최종본 없는 항목 수)
 function updateTransBadge() {
   var badge = document.getElementById('transBadge');
-  if (!badge) return;
+  if (badge) {
+    var count = 0;
+    var tm = APP.cache.transMap || {};
+    Object.keys(tm).forEach(function(key) {
+      var rec = tm[key];
+      if (rec.sourceText && rec.sourceText.trim() && rec.status !== 'reviewed') count++;
+    });
+    if (count > 0) { badge.textContent = count; badge.style.display = ''; }
+    else badge.style.display = 'none';
+  }
+  updateInputBadge();
+}
 
-  var count = 0;
-  var tm = APP.cache.transMap || {};
-  Object.keys(tm).forEach(function(key) {
-    var rec = tm[key];
-    // 원문 있고 아직 검수완료가 아니면 대기
-    if (rec.sourceText && rec.sourceText.trim() && rec.status !== 'reviewed') {
-      count++;
-    }
+// 입력 탭 배지: 미입력 학생이 있는 과목 합계
+function updateInputBadge() {
+  var badge = document.getElementById('inputBadge');
+  if (!badge) return;
+  if (!APP.subjects || !APP.subjects.length) { badge.style.display = 'none'; return; }
+
+  var totalMissing = 0;
+  APP.subjects.forEach(function(s) {
+    totalMissing += countMissingInput(s.subjectCode, s.type === '동아리');
   });
 
-  if (count > 0) {
-    badge.textContent = count;
+  if (totalMissing > 0) {
+    badge.textContent = totalMissing;
     badge.style.display = '';
   } else {
     badge.style.display = 'none';
@@ -890,6 +947,7 @@ function setView(btn) {
 
   // 뷰 전환 시 현재 선택 과목 다시 렌더
   if (view === 'input' || view === 'translate') {
+    refreshSubjectDropdownCounts(); // 입력/번역 모드별 접두사 갱신
     if (APP.selectedSubject) renderCurrentView();
     else { showEmptyForView(view); }
   }
