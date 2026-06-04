@@ -123,6 +123,7 @@
         <button class="btn-icon" onclick="loadTeacherList()">👥 교사 권한</button>
         <button class="btn-icon" onclick="openSettingsModal()">⚙️ 엔진·프롬프트</button>
         <button class="btn-icon" onclick="openRefModal()">📚 용어·예시</button>
+        <button class="btn-icon" onclick="openNeisRulesModal()">✅ 검토 규칙</button>
         <button class="btn-icon" onclick="loadCurriculumList()">📖 과목·동아리 편집</button>
         <button class="btn-icon" onclick="openClearDataModal()" style="border-color:#dc2626;color:#dc2626">🗑️ 입력 데이터 초기화</button>
       </div>
@@ -184,6 +185,46 @@
     <div class="mfooter">
       <button class="btn-cancel" onclick="closeModal('refOverlay')">취소</button>
       <button class="btn-save" onclick="saveRefModal()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEIS 검토 규칙 모달 -->
+<div class="overlay" id="neisRulesOverlay">
+  <div class="modal" style="max-width:560px">
+    <button class="modal-x" onclick="closeModal('neisRulesOverlay')">×</button>
+    <h3>✅ NEIS 검토 규칙</h3>
+    <div class="frow">
+      <label class="flabel">최대 글자수</label>
+      <input class="finput" id="nr_maxChars" type="number" min="1" value="500">
+    </div>
+    <div class="frow">
+      <label class="flabel">금칙 특수문자 (붙여서 입력)</label>
+      <input class="finput" id="nr_forbidden" placeholder="<>{}[]\\|^~`">
+    </div>
+    <div class="frow">
+      <label class="flabel">
+        <input type="checkbox" id="nr_checkEnding" style="width:auto;margin-right:6px">문체 종결 검사
+      </label>
+      <input class="finput" id="nr_endings" placeholder="함.,임.,됨.,있음.">
+      <span style="font-size:11px;color:var(--gray)">쉼표로 구분</span>
+    </div>
+    <div class="frow">
+      <label class="flabel">
+        <input type="checkbox" id="nr_checkDup" style="width:auto;margin-right:6px">반복 단어 검사
+      </label>
+      <span style="font-size:12px">임계값(회):
+        <input class="finput" id="nr_dupThreshold" type="number" min="2" value="3" style="width:70px;display:inline-block">
+      </span>
+    </div>
+    <div class="frow">
+      <label class="flabel">금지 단어 (쉼표로 구분)</label>
+      <textarea class="finput ftarea" id="nr_bannedWords" rows="2"
+        placeholder="예: 1등, 최고, 천재"></textarea>
+    </div>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="closeModal('neisRulesOverlay')">취소</button>
+      <button class="btn-save" onclick="saveNeisRules()">저장</button>
     </div>
   </div>
 </div>

@@ -789,7 +789,7 @@ function rowHtml(r, i, role) {
       <div class="final-diff" id="fdiff_${i}"
         style="${finalDiff?'':'display:none'};padding:6px 6px;font-size:11px;line-height:1.6;
         word-break:break-word;background:#fffdf5;border-top:1px dashed #fbbf24">
-        <div style="font-size:9px;color:var(--gray);margin-bottom:3px">🟦 AI번역 · 🟩 직접수정</div>
+        <div style="font-size:9px;color:var(--gray);margin-bottom:3px">🟦 AI번역 · 🟩 직접추가 · <span style="text-decoration:line-through;color:#dc2626">삭제</span></div>
         ${finalDiff}
       </div>
     </td>
@@ -867,7 +867,7 @@ function onFinalChange(i, val) {
   if (fdiffEl && draft) {
     if (val && val !== draft) {
       fdiffEl.innerHTML =
-        '<div style="font-size:9px;color:var(--gray);margin-bottom:3px">🟦 AI번역 · 🟩 직접수정</div>' +
+        '<div style="font-size:9px;color:var(--gray);margin-bottom:3px">🟦 AI번역 · 🟩 직접추가 · <span style="text-decoration:line-through;color:#dc2626">삭제</span></div>' +
         buildFinalDiffHtml(draft, val);
       fdiffEl.style.display = '';
     } else {
@@ -1199,35 +1199,53 @@ function downloadExcel() {
 }
 
 // ── NEIS 검토 ────────────────────────────────────────────────
-// 최종본 단어 단위 diff: AI원본과 같은 부분=파랑, 수정/추가=초록
+// 최종본 문자 단위 diff: AI원본 유지=파랑, 직접추가=초록, 삭제=빨간 취소선
 function buildFinalDiffHtml(aiDraft, finalText) {
-  if (!aiDraft || !finalText) return e(finalText || '');
-  // 단어(공백 포함) 단위 토큰화
-  var a = aiDraft.split(/(\s+)/);
-  var b = finalText.split(/(\s+)/);
-
-  // LCS 테이블
+  if (!aiDraft) return e(finalText || '');
+  if (aiDraft === finalText) {
+    // 변경 없음 → 전체 파랑
+    return '<span style="color:#2563eb">' + e(finalText) + '</span>';
+  }
+  var a = Array.from(aiDraft);   // 문자 배열 (한글 안전)
+  var b = Array.from(finalText);
   var n = a.length, m = b.length;
+
+  // LCS DP
   var dp = [];
   for (var i = 0; i <= n; i++) dp[i] = new Array(m + 1).fill(0);
-  for (var i = n - 1; i >= 0; i--) {
-    for (var j = m - 1; j >= 0; j--) {
+  for (var i = n - 1; i >= 0; i--)
+    for (var j = m - 1; j >= 0; j--)
       dp[i][j] = (a[i] === b[j]) ? dp[i+1][j+1] + 1 : Math.max(dp[i+1][j], dp[i][j+1]);
-    }
-  }
-  // b 기준으로 재구성: 공통=파랑, b에만 있음(추가/수정)=초록
-  var out = '', i2 = 0, j2 = 0;
+
   function blue(t){ return '<span style="color:#2563eb">' + e(t) + '</span>'; }
-  function green(t){ return '<span style="color:#16a34a;font-weight:600;background:#dcfce7;border-radius:2px">' + e(t) + '</span>'; }
-  while (j2 < m) {
-    if (i2 < n && a[i2] === b[j2]) {       // 공통
-      out += blue(b[j2]); i2++; j2++;
-    } else if (i2 < n && dp[i2+1][j2] >= dp[i2][j2+1]) {
-      i2++;                                 // AI에만 있던 단어 삭제됨 → 표시 안 함
+  function green(t){ return '<span style="color:#16a34a;font-weight:600;background:#dcfce7">' + e(t) + '</span>'; }
+  function strike(t){ return '<span style="color:#dc2626;text-decoration:line-through;opacity:0.7">' + e(t) + '</span>'; }
+
+  // 연속 같은 종류 묶어서 출력 (span 최소화)
+  var out = '', i2 = 0, j2 = 0;
+  var buf = '', bufType = '';
+  function flush() {
+    if (!buf) return;
+    if (bufType === 'common') out += blue(buf);
+    else if (bufType === 'add') out += green(buf);
+    else if (bufType === 'del') out += strike(buf);
+    buf = '';
+  }
+  function push(type, ch) {
+    if (bufType !== type) { flush(); bufType = type; }
+    buf += ch;
+  }
+
+  while (i2 < n || j2 < m) {
+    if (i2 < n && j2 < m && a[i2] === b[j2]) {
+      push('common', b[j2]); i2++; j2++;
+    } else if (j2 < m && (i2 >= n || dp[i2][j2+1] >= dp[i2+1][j2])) {
+      push('add', b[j2]); j2++;        // 최종본에만 = 직접 추가
     } else {
-      out += green(b[j2]); j2++;            // 최종본에만 있는 단어 = 직접 작성
+      push('del', a[i2]); i2++;        // AI에만 = 삭제됨 (취소선)
     }
   }
+  flush();
   return out;
 }
 
@@ -1653,6 +1671,43 @@ async function changeRole(name) {
 
 function renderAdminTab() {
   loadTeacherList();
+}
+
+// ── 관리자: NEIS 검토 규칙 ────────────────────────────────────
+async function openNeisRulesModal() {
+  try {
+    var res = await API.getSettings();
+    if (res && res.success) APP.settings = res.data;
+  } catch(e) {}
+  var r = (APP.settings && APP.settings.neisRules) || {};
+  document.getElementById('nr_maxChars').value     = r.maxChars != null ? r.maxChars : 500;
+  document.getElementById('nr_forbidden').value    = r.forbidden != null ? r.forbidden : '<>{}[]\\|^~`';
+  document.getElementById('nr_endings').value      = r.endings != null ? r.endings : '함.,임.,됨.,있음.,없음.,보임.,나타남.,이룸.';
+  document.getElementById('nr_dupThreshold').value = r.dupThreshold != null ? r.dupThreshold : 3;
+  document.getElementById('nr_checkEnding').checked = r.checkEnding !== false;
+  document.getElementById('nr_checkDup').checked    = r.checkDup !== false;
+  document.getElementById('nr_bannedWords').value  = r.bannedWords || '';
+  document.getElementById('neisRulesOverlay').classList.add('open');
+}
+
+async function saveNeisRules() {
+  var rules = {
+    maxChars:     parseInt(document.getElementById('nr_maxChars').value) || 500,
+    forbidden:    document.getElementById('nr_forbidden').value,
+    endings:      document.getElementById('nr_endings').value,
+    dupThreshold: parseInt(document.getElementById('nr_dupThreshold').value) || 3,
+    checkEnding:  document.getElementById('nr_checkEnding').checked,
+    checkDup:     document.getElementById('nr_checkDup').checked,
+    bannedWords:  document.getElementById('nr_bannedWords').value
+  };
+  try {
+    var res = await API.saveSettings({ neisRules: rules });
+    if (res.success) {
+      toast('검토 규칙 저장 완료 ✓', 'success');
+      if (APP.settings) APP.settings.neisRules = rules;
+      closeModal('neisRulesOverlay');
+    } else toast('저장 실패: ' + res.error, 'error');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ── 관리자: 입력 데이터 초기화 ────────────────────────────────
