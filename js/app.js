@@ -210,10 +210,10 @@ function renderSubjectSelect() {
 
   var isAdmin = APP.teacher && APP.teacher.role === '관리자';
 
-  // 과목별 번역 대기 건수 접미사
-  function pendingSuffix(subjectCode) {
+  // 과목별 번역 대기 건수 접두사 (과목명 앞)
+  function pendingPrefix(subjectCode) {
     var n = countPendingBySubject(subjectCode);
-    return n > 0 ? ' (번역대기 ' + n + ')' : '';
+    return n > 0 ? '🔴' + n + ' ' : '';
   }
 
   // 관리자: 교사명 기준 정렬, 동일 교사면 학년 순
@@ -249,7 +249,7 @@ function renderSubjectSelect() {
             ? ' [' + s.teachers.join(', ') + ']' : '';
           var gradePrefix = tab === '과목' ? 'G' + s.grade + ' | ' : '';
           return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
-            `${gradePrefix}${s.nameKR}${allTeachers}${pendingSuffix(s.subjectCode)}</option>`;
+            `${pendingPrefix(s.subjectCode)}${gradePrefix}${s.nameKR}${allTeachers}</option>`;
         }).join('');
         return `<optgroup label="👤 ${teacher}">${opts}</optgroup>`;
       }).join('');
@@ -258,7 +258,7 @@ function renderSubjectSelect() {
       (tab === '과목' ? '과목 선택' : '동아리 선택') + ' --</option>' +
       filtered.map(function(s) {
         return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
-          `${s.nameKR} / ${s.nameEN}${pendingSuffix(s.subjectCode)}</option>`;
+          `${pendingPrefix(s.subjectCode)}${s.nameKR} / ${s.nameEN}</option>`;
       }).join('');
   }
 }
@@ -380,13 +380,13 @@ function renderInputTable() {
 
   // colgroup
   var cols = '<colgroup>' +
-    '<col style="width:10%">' +  // Name EN
-    '<col style="width:8%">' +   // 이름
-    '<col style="width:5%">' +   // Gr
-    '<col style="width:5%">' +   // Cls
-    '<col style="width:8%">' +   // NEIS
-    '<col style="width:50%">' +  // 원문 입력
-    '<col style="width:14%">' +  // 상태/저장
+    '<col style="width:7%">' +   // Name EN
+    '<col style="width:6%">' +   // 이름
+    '<col style="width:3.5%">' + // Gr
+    '<col style="width:3.5%">' + // Cls
+    '<col style="width:5%">' +   // NEIS
+    '<col style="width:64%">' +  // 원문 입력 (확대)
+    '<col style="width:11%">' +  // 상태/저장
     '</colgroup>';
   var existing = table.querySelector('colgroup');
   if (existing) existing.remove();
@@ -1009,7 +1009,12 @@ async function saveRow(i, opts) {
       }
       updateTransBadge();
       refreshSubjectDropdownCounts();
-      refreshRow(i);
+      // 현재 뷰에 맞는 행 갱신
+      if (APP.currentView === 'input') {
+        renderInputTable();
+      } else {
+        refreshRow(i);
+      }
       toast('저장 완료 ✓', 'success');
     } else {
       toast('저장 실패: ' + (res && res.error || ''), 'error');
