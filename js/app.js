@@ -362,7 +362,7 @@ function renderInputTable() {
       '<td><div class="ci">' + s.grade + '</div></td>' +
       '<td><div class="ci">' + s.class + '</div></td>' +
       '<td><div class="ci ci-neis">' + e(s.neis||s.neisClass||'') + '</div></td>' +
-      '<td><textarea class="cta src" oninput="onInputSourceChange(' + i + ',this.value)">' + e(r.sourceText) + '</textarea></td>' +
+      '<td><textarea class="cta src" oninput="onInputSourceChange(' + i + ',this.value);autoResize(this)">' + e(r.sourceText) + '</textarea></td>' +
       '<td><div class="ci" style="padding:5px 4px;display:flex;flex-direction:column;gap:5px;align-items:stretch">' +
         '<div style="text-align:center">' + buildInputStatus(r) + '</div>' +
         '<button class="btn-tr" onclick="saveRow(' + i + ')" ' +
@@ -371,6 +371,7 @@ function renderInputTable() {
       '</div></td>' +
     '</tr>';
   }).join('');
+  autoResizeAll();
 }
 
 function buildInputStatus(r) {
@@ -501,17 +502,17 @@ function renderTable() {
 
   var colsInfo = '<colgroup>' +
     '<col style="width:6%">' +   // Name EN
-    '<col style="width:5%">' +   // 이름
-    '<col style="width:3%">' +   // Gr.
-    '<col style="width:3%">' +   // Cls.
-    '<col style="width:5%">' +   // NEIS
-    '<col style="width:16%">' +  // Source
+    '<col style="width:4%">' +   // 이름
+    '<col style="width:2.5%">' + // Gr.
+    '<col style="width:2.5%">' + // Cls.
+    '<col style="width:4%">' +   // NEIS
+    '<col style="width:21%">' +  // Source
     '<col style="width:3%">' +   // 번역
-    '<col style="width:16%">' +  // 번역 초본
-    '<col style="width:16%">' +  // 최종본
+    '<col style="width:21%">' +  // 번역 초본
+    '<col style="width:21%">' +  // 최종본
     '<col style="width:3%">' +   // 검토
-    '<col style="width:10%">' +  // 검수 코멘트
-    '<col style="width:4%">' +   // 글자수
+    '<col style="width:7%">' +   // 검수 코멘트
+    '<col style="width:3%">' +   // 글자수
     '<col style="width:5%">' +   // 상태
     '</colgroup>';
 
@@ -538,6 +539,19 @@ function renderTable() {
     '</tr>';
 
   body.innerHTML = APP.rows.map((r, i) => rowHtml(r, i, role)).join('');
+  autoResizeAll();
+}
+
+// 모든 textarea 높이를 내용에 맞춤
+function autoResizeAll() {
+  setTimeout(function() {
+    document.querySelectorAll('#mainTable textarea.cta, #inputTable textarea.cta').forEach(autoResize);
+  }, 0);
+}
+function autoResize(ta) {
+  if (!ta) return;
+  ta.style.height = 'auto';
+  ta.style.height = Math.max(76, ta.scrollHeight) + 'px';
 }
 
 function rowHtml(r, i, role) {
@@ -555,7 +569,7 @@ function rowHtml(r, i, role) {
     <td><div class="ci">${s.grade}</div></td>
     <td><div class="ci">${s.class}</div></td>
     <td><div class="ci ci-neis">${e(s.neis||s.neisClass||'')}</div></td>
-    <td><textarea class="cta src" oninput="APP.rows[${i}].sourceText=this.value;markDirty(${i})"
+    <td><textarea class="cta src" oninput="APP.rows[${i}].sourceText=this.value;markDirty(${i});autoResize(this)"
       >${e(r.sourceText)}</textarea></td>
     <td class="ca">
       <button class="btn-arrow" onclick="pipelineRow(${i})" title="번역"
@@ -571,11 +585,11 @@ function rowHtml(r, i, role) {
         style="background:#f8fafc;color:var(--text2);${diffHtml?'display:none':''}">${e(r.translatedDraft)}</textarea>
       <div class="diff-box" id="diff_${i}"
         style="${diffHtml?'':'display:none'};min-height:76px;padding:7px 6px;
-        font-size:12px;line-height:1.6;word-break:break-all;background:#f8fafc;
-        overflow-y:auto;border:none">${diffHtml}</div>
+        font-size:12px;line-height:1.6;word-break:break-word;background:#f8fafc;
+        border:none">${diffHtml}</div>
     </td>
     <td>
-      <textarea class="cta fnl" id="fnl_${i}" oninput="onFinalChange(${i},this.value)">${e(r.finalText)}</textarea>
+      <textarea class="cta fnl" id="fnl_${i}" oninput="onFinalChange(${i},this.value);autoResize(this)">${e(r.finalText)}</textarea>
     </td>
     <td class="ca">
       <button class="btn-arrow" onclick="runNeisCheck(${i})" title="NEIS 검토"
@@ -586,7 +600,7 @@ function rowHtml(r, i, role) {
     </td>
     <td><div class="cta cmt" id="neis_cmt_${i}"
       style="min-height:76px;padding:7px 9px;font-size:11px;
-      color:var(--text2);background:#fafafa;overflow-y:auto;white-space:pre-wrap">${e(r.comment)}</div></td>
+      color:var(--text2);background:#fafafa;white-space:pre-wrap">${e(r.comment)}</div></td>
     <td><div class="cc ${ccCls}">
       ${cc>0 ? '<span style="font-size:9px;color:var(--gray);display:block">' +
         (document.getElementById('selSem')?.value==='1'?'1학기':'2학기') +
@@ -615,6 +629,10 @@ function refreshRow(i) {
   var newTr = tmp.firstElementChild;
   newTr.id = 'row_' + i;
   tr.parentNode.replaceChild(newTr, tr);
+  // 새 행의 textarea 높이 맞춤
+  setTimeout(function() {
+    newTr.querySelectorAll('textarea.cta').forEach(autoResize);
+  }, 0);
 }
 
 function showEmptyTrans() {
