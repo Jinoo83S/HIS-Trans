@@ -105,21 +105,19 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance
 .sheet thead th.tht { color: var(--teal); background: #ecfeff; }
 .sheet thead th.thf { color: var(--green); background: #f0fdf4; }
 .sheet tbody tr { background: var(--bg2); }
-.sheet tbody tr:nth-child(even) { background: #f8fafc; }
-.sheet tbody tr:hover { background: #e0f2fe !important; }
 .sheet tbody td { border: 1px solid var(--border); padding: 0; vertical-align: top; }
 .ci { padding: 6px 4px; color: var(--text); font-size: 12px; text-align: center;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ci-neis { color: var(--primary); font-weight: 600; font-size: 11px; }
-.cta { width: 100%; min-height: 76px; background: transparent; border: none; outline: none;
+.cta { width: 100%; min-height: 76px; background: #fff; border: none; outline: none;
   color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 12px;
   line-height: 1.6; padding: 7px 6px; resize: none; display: block;
-  word-break: break-word; overflow: hidden; }
+  word-break: break-word; overflow: hidden; box-sizing: border-box; }
 .cta:focus { background: #f0f9ff; }
 .cta.drft { background: #f8fafc; }
 .cta.fnl  { background: #f0fdf4; }
 .cta.cmt  { font-size: 11px; color: var(--gray); background: #fafafa; }
-.ca { padding: 6px; text-align: center; background: #f8fafc; vertical-align: top; }
+.ca { padding: 6px; text-align: center; background: #fff; vertical-align: top; }
 .btn-tr { background: var(--teal); color: #fff; border: none; border-radius: 4px;
   font-size: 11px; font-weight: 700; padding: 5px 8px; cursor: pointer; width: 100%;
   margin-bottom: 4px; font-family: 'Noto Sans KR', sans-serif; }
@@ -218,3 +216,8 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance
 .nav-badge { display: inline-block; margin-left: 6px; background: var(--red); color: #fff;
   font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; line-height: 18px;
   border-radius: 9px; padding: 0 5px; text-align: center; vertical-align: middle; }
+
+/* 열 너비 조절 핸들 */
+.col-resizer { position: absolute; top: 0; right: -3px; width: 6px; height: 100%;
+  cursor: col-resize; z-index: 20; user-select: none; }
+.col-resizer:hover { background: var(--teal); opacity: 0.5; }
