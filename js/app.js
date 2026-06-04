@@ -462,11 +462,22 @@ async function pipelineAll() {
   var targets = APP.rows.filter(function(r) { return r.sourceText && r.sourceText.trim() && !r.finalText; });
   if (!targets.length) { toast('번역할 항목이 없습니다.', 'error'); return; }
 
+  // 건수 많으면 경고 (GAS quota 대비)
+  if (targets.length > 30) {
+    if (!confirm(targets.length + '명을 한 번에 번역합니다.\n\n' +
+        '대량 번역은 AI 응답 한도(quota)에 걸리거나 시간이 오래 걸릴 수 있습니다.\n' +
+        '30명 이하로 나눠 진행하는 것을 권장합니다.\n\n계속하시겠습니까?')) {
+      return;
+    }
+  }
+
   APP.progressCancelled = false;
   showProgress('전체 번역 진행 중', 1, targets.length);
 
+  var okCount = 0, failCount = 0, quotaHit = false;
+
   for (var idx = 0; idx < targets.length; idx++) {
-    if (APP.progressCancelled) { toast('중단되었습니다.', 'error'); break; }
+    if (APP.progressCancelled) { break; }
     var row = targets[idx];
     var i = APP.rows.indexOf(row);
     var pct = Math.round((idx / targets.length) * 100);
@@ -488,12 +499,56 @@ async function pipelineAll() {
         row.status = 'ai_draft';
         row._dirty = true;
         refreshRow(i);
+        okCount++;
+      } else {
+        failCount++;
+        // quota/한도 관련 오류 감지 시 중단
+        if (res.error && (res.error.indexOf('quota') !== -1 ||
+            res.error.indexOf('한도') !== -1 || res.error.indexOf('limit') !== -1 ||
+            res.error.indexOf('혼잡') !== -1)) {
+          quotaHit = true;
+          break;
+        }
       }
-    } catch(e) {}
+    } catch(e) { failCount++; }
+
+    // rate limit 완화: 호출 간 짧은 지연
+    if (idx < targets.length - 1) await new Promise(function(r){ setTimeout(r, 300); });
   }
+
   setProgress(100, '완료', '');
   setTimeout(hideProgress, 500);
-  toast('전체 번역 완료 ✓', 'success');
+
+  var msg = '번역 완료: ' + okCount + '명 성공';
+  if (failCount) msg += ', ' + failCount + '명 실패';
+  if (quotaHit) msg += ' (한도 도달 — 잠시 후 나머지를 다시 시도하세요)';
+  toast(msg + ' ✓', quotaHit || failCount ? 'error' : 'success');
+
+  // 결과를 잃지 않도록 일괄 저장 안내 (AI초안 상태 유지)
+  if (okCount > 0) {
+    setTimeout(function() {
+      if (confirm('번역된 ' + okCount + '명의 결과를 저장하시겠습니까?\n(저장하지 않으면 새로고침 시 사라집니다)\n\n※ 저장 후에도 검수 교사가 확인·저장해야 검수완료됩니다.')) {
+        saveAllAiDraft();
+      }
+    }, 700);
+  }
+}
+
+// 번역 직후 일괄 저장 (ai_draft 상태 유지)
+async function saveAllAiDraft() {
+  var targets = APP.rows.filter(r => r.status === 'ai_draft' && r._dirty);
+  if (!targets.length) { toast('저장할 항목이 없습니다.', 'success'); return; }
+  var btn = document.getElementById('btnSaveAll');
+  if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
+  var ok = 0, fail = 0;
+  for (var idx = 0; idx < targets.length; idx++) {
+    var i = APP.rows.indexOf(targets[idx]);
+    try { await saveRow(i, { keepAiDraft: true }); ok++; } catch(e) { fail++; }
+    if (btn) btn.textContent = '저장 중... ' + (idx+1) + '/' + targets.length;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '💾 일괄 저장'; }
+  toast('저장 완료: ' + ok + '건' + (fail ? ', ' + fail + '건 실패' : '') + ' ✓', fail ? 'error' : 'success');
+  renderTable();
 }
 
 // ── 진행 팝업 ──────────────────────────────────────────────────
@@ -881,7 +936,8 @@ async function translateAll() {
 }
 
 // ── 저장 ────────────────────────────────────────────────────
-async function saveRow(i) {
+async function saveRow(i, opts) {
+  opts = opts || {};
   var row = APP.rows[i];
   var s = APP.selectedSubject;
   if (!s) { toast('과목을 선택하세요.', 'error'); return; }
@@ -889,11 +945,14 @@ async function saveRow(i) {
   try {
     var res;
     // 저장 시 상태 결정
-    // - 입력 탭(외국인 교사): 원문만 저장 → draft (최종본 없음)
-    // - 번역 탭(검수 교사)에서 사람이 저장: 최종본 있으면 reviewed (검수 완료)
+    // - 입력 탭(외국인 교사): 원문만 저장 → draft
+    // - 번역 직후 일괄저장(keepAiDraft): AI초안 상태 유지 → ai_draft
+    // - 번역 탭에서 사람이 직접 저장: 최종본 있으면 reviewed (검수 완료)
     var saveStatus;
     if (APP.currentView === 'input') {
       saveStatus = 'draft';
+    } else if (opts.keepAiDraft && row.status === 'ai_draft') {
+      saveStatus = 'ai_draft';
     } else {
       saveStatus = row.finalText ? 'reviewed' : 'draft';
     }
