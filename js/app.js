@@ -30,6 +30,18 @@ var APP = {
 // 원문 길이 경고 임계값 (영어 세특은 보통 2000자 이내)
 var SOURCE_WARN_LEN = 3000;
 
+// NEIS 글자수(바이트) 계산: 한글/전각=2, 영문·숫자·공백 등=1, 줄바꿈 제외
+// 시트 서식 =2*LENB(A)-LEN(SUBSTITUTE(A,CHAR(10),"")) 와 동일 기준
+function neisByteLength(str) {
+  if (!str) return 0;
+  var s = String(str).replace(/\n/g, ''); // 줄바꿈 제외
+  var len = 0;
+  for (var i = 0; i < s.length; i++) {
+    len += (s.charCodeAt(i) > 127) ? 2 : 1; // 비ASCII(한글 등)=2
+  }
+  return len;
+}
+
 // ── 초기화 ──────────────────────────────────────────────────
 window.onload = async function() {
   if (!Config.isSet()) { window.location.href = 'index.html'; return; }
@@ -893,7 +905,7 @@ function autoResize(ta) {
 function rowHtml(r, i, role) {
   var s = r.student;
   var txt = r.finalText || r.translatedDraft || '';
-  var cc = txt.length;
+  var cc = neisByteLength(txt);
   var ccCls = cc === 0 ? '' : cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
   // AI 세특 원본 대비 수정 부분 하이라이트 (최종본 있으면 항상 표시)
   // aiFinal 없으면(저장 후 재로드 등) 전체를 파란색으로
@@ -1004,7 +1016,7 @@ function onFinalChange(i, val) {
 }
 function updateCC(i) {
   var txt = APP.rows[i].finalText || APP.rows[i].translatedDraft || '';
-  var cc = txt.length;
+  var cc = neisByteLength(txt);
   var el = document.querySelector('#row_' + i + ' .cc');
   if (!el) return;
   var cls = cc === 0 ? '' : cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
