@@ -500,16 +500,17 @@ function renderInputTable() {
       '<td><div class="ci">' + s.class + '</div></td>' +
       '<td><div class="ci ci-neis">' + e(s.neis||s.neisClass||'') + '</div></td>' +
       '<td><textarea class="cta src" oninput="onInputSourceChange(' + i + ',this.value);autoResize(this)">' + e(r.sourceText) + '</textarea></td>' +
-      '<td class="ca"><button class="btn-teal" onclick="pipelineRow(' + i + ')" ' +
+      '<td style="vertical-align:top;padding:7px 5px">' +
+        '<button class="btn-teal" onclick="pipelineRow(' + i + ')" ' +
         (r.translating ? 'disabled' : '') +
-        ' style="width:100%;font-size:11px;padding:6px 4px">' +
-        (r.translating ? '⏳' : '▶ Translate') + '</button></td>' +
-      '<td><div class="ci" style="padding:5px 4px;display:flex;flex-direction:column;gap:5px;align-items:stretch">' +
-        '<div style="text-align:center">' + buildInputStatus(r) + '</div>' +
+        ' style="width:100%;font-size:11px;padding:7px 4px;white-space:nowrap">' +
+        (r.translating ? '⏳ ...' : '▶ Translate') + '</button></td>' +
+      '<td style="vertical-align:top;padding:7px 5px">' +
         '<button class="btn-tr" onclick="saveRow(' + i + ')" ' +
-        'style="width:100%;' +
+        'style="width:100%;font-size:11px;padding:7px 4px;margin-bottom:5px;' +
         (r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : '') + '">💾 Save</button>' +
-      '</div></td>' +
+        '<div style="text-align:center;font-size:10px">' + buildInputStatus(r) + '</div>' +
+      '</td>' +
     '</tr>';
   }).join('');
   autoResizeAll();
@@ -533,11 +534,12 @@ function buildInputStatus(r) {
 function onInputSourceChange(i, val) {
   APP.rows[i].sourceText = val;
   APP.rows[i]._dirty = true;
-  var cell = document.querySelector('#irow_' + i + ' td:last-child .ci');
+  var cell = document.querySelector('#irow_' + i + ' td:last-child');
   if (cell) cell.innerHTML =
-    '<div style="text-align:center">' + buildInputStatus(APP.rows[i]) + '</div>' +
     '<button class="btn-tr" onclick="saveRow(' + i + ')" ' +
-    'style="width:100%;background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700">💾 Save</button>';
+    'style="width:100%;font-size:11px;padding:7px 4px;margin-bottom:5px;' +
+    'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700">💾 Save</button>' +
+    '<div style="text-align:center;font-size:10px">' + buildInputStatus(APP.rows[i]) + '</div>';
 }
 
 // ── 2단계 파이프라인 (단일 행) ────────────────────────────────
