@@ -27,6 +27,9 @@ var APP = {
   progressCancelled: false
 };
 
+// 원문 길이 경고 임계값 (영어 세특은 보통 2000자 이내)
+var SOURCE_WARN_LEN = 3000;
+
 // ── 초기화 ──────────────────────────────────────────────────
 window.onload = async function() {
   if (!Config.isSet()) { window.location.href = 'index.html'; return; }
@@ -490,8 +493,13 @@ function renderInputTable() {
 
 function buildInputStatus(r) {
   if (!r.sourceText) return '<span class="sbadge s-draft">미입력</span>';
-  if (r._dirty || !r.rowIndex) return '<span style="font-size:10px;font-weight:700;color:var(--red)">● 미저장</span>';
-  return '<span class="sbadge s-reviewed">입력완료</span>';
+  var warn = '';
+  if (r.sourceText.trim().length > SOURCE_WARN_LEN) {
+    warn = '<div style="font-size:9px;color:var(--red);margin-top:2px" title="원문이 너무 깁니다">⚠️ ' +
+      r.sourceText.trim().length + '자</div>';
+  }
+  if (r._dirty || !r.rowIndex) return '<span style="font-size:10px;font-weight:700;color:var(--red)">● 미저장</span>' + warn;
+  return '<span class="sbadge s-reviewed">입력완료</span>' + warn;
 }
 
 function onInputSourceChange(i, val) {
@@ -508,6 +516,14 @@ function onInputSourceChange(i, val) {
 async function pipelineRow(i) {
   var row = APP.rows[i];
   if (!row.sourceText || !row.sourceText.trim()) { toast('원문이 없습니다.', 'error'); return; }
+
+  // 비정상적으로 긴 원문 경고 (토큰 폭증 방지)
+  var len = row.sourceText.trim().length;
+  if (len > SOURCE_WARN_LEN) {
+    if (!confirm('⚠️ 원문이 매우 깁니다 (' + len + '자).\n\n' +
+      '일반 세특은 2,000자 이내입니다. 코드나 불필요한 내용이 섞이지 않았는지 확인하세요.\n' +
+      '이대로 번역하면 토큰(비용)이 많이 사용됩니다.\n\n계속하시겠습니까?')) return;
+  }
 
   showProgress('번역 진행 중', 1, 2);
   setProgress(0, '1단계: 번역 중...', row.student.name);
@@ -548,6 +564,16 @@ async function pipelineRow(i) {
 async function pipelineAll() {
   var targets = APP.rows.filter(function(r) { return r.sourceText && r.sourceText.trim() && !r.finalText; });
   if (!targets.length) { toast('번역할 항목이 없습니다.', 'error'); return; }
+
+  // 비정상적으로 긴 원문 경고
+  var longOnes = targets.filter(function(r) { return r.sourceText.trim().length > SOURCE_WARN_LEN; });
+  if (longOnes.length) {
+    var names = longOnes.slice(0, 5).map(function(r){ return r.student.name; }).join(', ');
+    if (!confirm('⚠️ 원문이 매우 긴 학생이 ' + longOnes.length + '명 있습니다.\n(' + names +
+      (longOnes.length > 5 ? ' 외' : '') + ')\n\n' +
+      '일반 세특은 2,000자 이내입니다. 코드나 불필요한 내용이 섞이지 않았는지 확인하세요.\n' +
+      '이대로 진행하면 토큰(비용)이 많이 사용됩니다.\n\n계속하시겠습니까?')) return;
+  }
 
   // 건수 많으면 경고 (GAS quota 대비)
   if (targets.length > 30) {
