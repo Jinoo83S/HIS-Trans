@@ -157,6 +157,22 @@
       <div style="flex:0 0 100px"><div class="flabel">Creativity</div>
         <input class="finput" id="setCreat" type="number" step="0.1" min="0" max="1" value="0.3"></div>
     </div>
+    <div class="frow" style="background:var(--bg3);padding:10px;border-radius:8px">
+      <div class="flabel">🔧 단계별 모델 분리 (선택) — 비우면 위 공통 모델 사용</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:3px">STEP 1 (번역) — 저가 모델 권장</div>
+          <select class="finput" id="setStep1Model"></select>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:3px">STEP 2 (세특 윤문) — 고품질 모델 권장</div>
+          <select class="finput" id="setStep2Model"></select>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--gray);margin-top:6px;line-height:1.6">
+        💡 STEP 1은 단순 직역이라 저렴한 모델로 충분합니다. STEP 2(세특체 변환)만 고품질 모델을 쓰면 품질 유지하며 비용 절감.
+      </div>
+    </div>
     <div class="frow"><div class="flabel">STEP 1 프롬프트 (번역)</div>
       <textarea class="finput ftarea" id="setStep1" rows="6"></textarea></div>
     <div class="frow"><div class="flabel">STEP 2 프롬프트 (세특 윤문)</div>

@@ -1965,7 +1965,38 @@ async function openSettingsModal() {
   document.getElementById('setCreat').value  = s.creativity || '0.3';
   document.getElementById('setStep1').value  = s.step1_prompt || '';
   document.getElementById('setStep2').value  = s.step2_prompt || '';
+  // 단계별 모델 드롭다운 채우기
+  populateStepModels(s.engine || 'claude', s.step1Model || '', s.step2Model || '');
   document.getElementById('settingsOverlay').classList.add('open');
+}
+
+// 모델별 추천 라벨 (비용/품질)
+var MODEL_RECO = {
+  'claude-opus-4-8':            '최고품질·고가 ⭐STEP2',
+  'claude-opus-4-6':            '고품질·고가 ⭐STEP2',
+  'claude-sonnet-4-6':         '균형·중가',
+  'claude-haiku-4-5-20251001': '저가·빠름 ⭐STEP1',
+  'gpt-4o':                     '고품질·중가',
+  'gpt-4o-mini':                '저가·빠름 ⭐STEP1',
+  'gpt-4-turbo':                '고품질·고가',
+  'gpt-3.5-turbo':              '최저가·빠름 ⭐STEP1',
+  'gemini-2.5-pro':             '고품질 ⭐STEP2',
+  'gemini-2.5-flash':          '무료·빠름 ⭐STEP1',
+  'gemini-2.0-flash':          '무료·빠름 ⭐STEP1',
+  'google-translate':           '무료·번역전용'
+};
+
+function populateStepModels(engine, step1Sel, step2Sel) {
+  var list = APP.models[engine] || [];
+  function opts(selected) {
+    return '<option value="">(공통 모델 사용)</option>' +
+      list.map(function(m) {
+        var reco = MODEL_RECO[m] ? ' — ' + MODEL_RECO[m] : '';
+        return '<option value="' + m + '"' + (m===selected?' selected':'') + '>' + m + reco + '</option>';
+      }).join('');
+  }
+  document.getElementById('setStep1Model').innerHTML = opts(step1Sel);
+  document.getElementById('setStep2Model').innerHTML = opts(step2Sel);
 }
 
 async function resetSettingsDefault() {
@@ -1988,6 +2019,10 @@ function onSetEngineChange() {
   sel.innerHTML = (APP.models[engine] || []).map(function(m) {
     return '<option value="' + m + '">' + m + '</option>';
   }).join('');
+  // 단계별 모델 드롭다운도 갱신 (엔진 바뀌면 선택 초기화)
+  if (document.getElementById('setStep1Model')) {
+    populateStepModels(engine, '', '');
+  }
 }
 
 function mergeCustomModels(custom) {
@@ -2079,6 +2114,8 @@ async function saveSettingsModal() {
     creativity:   document.getElementById('setCreat').value,
     step1_prompt: document.getElementById('setStep1').value,
     step2_prompt: document.getElementById('setStep2').value,
+    step1Model:   document.getElementById('setStep1Model').value,
+    step2Model:   document.getElementById('setStep2Model').value,
     customModels: getCustomModels()
   };
   try {
