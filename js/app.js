@@ -385,7 +385,7 @@ function refreshSubjectDropdownCounts() {
 async function onSubjectChange() {
   var sel = document.getElementById('selSubject');
   var opt = sel.options[sel.selectedIndex];
-  if (!opt || !opt.dataset.s) { APP.selectedSubject = null; showEmptyTrans(); return; }
+  if (!opt || !opt.dataset.s) { APP.selectedSubject = null; showEmptyForView(APP.currentView); return; }
 
   APP.selectedSubject = JSON.parse(opt.dataset.s);
   var isClub      = APP.currentTab === '동아리';
@@ -677,7 +677,8 @@ async function saveAllAiDraft() {
   var ok = 0, fail = 0;
   for (var idx = 0; idx < targets.length; idx++) {
     var i = APP.rows.indexOf(targets[idx]);
-    try { await saveRow(i, { keepAiDraft: true }); ok++; } catch(e) { fail++; }
+    var success = await saveRow(i, { keepAiDraft: true, silent: true });
+    if (success) ok++; else fail++;
     if (btn) btn.textContent = '저장 중... ' + (idx+1) + '/' + targets.length;
   }
   if (btn) { btn.disabled = false; btn.textContent = '💾 일괄 저장'; }
@@ -1007,7 +1008,7 @@ function switchTab(tab) {
   document.getElementById('tab과목').className = 'tab' + (tab==='과목'?' active':'');
   document.getElementById('tab동아리').className = 'tab' + (tab==='동아리'?' active':'');
   renderSubjectSelect();
-  showEmptyTrans();
+  showEmptyForView(APP.currentView);
 }
 
 function onEngineChange() {
@@ -1161,7 +1162,7 @@ async function saveRow(i, opts) {
   opts = opts || {};
   var row = APP.rows[i];
   var s = APP.selectedSubject;
-  if (!s) { toast('과목을 선택하세요.', 'error'); return; }
+  if (!s) { if (!opts.silent) toast('과목을 선택하세요.', 'error'); return false; }
 
   try {
     var res;
@@ -1225,11 +1226,16 @@ async function saveRow(i, opts) {
       } else {
         refreshRow(i);
       }
-      toast('저장 완료 ✓', 'success');
+      if (!opts.silent) toast('저장 완료 ✓', 'success');
+      return true;
     } else {
-      toast('저장 실패: ' + (res && res.error || ''), 'error');
+      if (!opts.silent) toast('저장 실패: ' + (res && res.error || ''), 'error');
+      return false;
     }
-  } catch(e) { toast(e.message, 'error'); }
+  } catch(e) {
+    if (!opts.silent) toast(e.message, 'error');
+    return false;
+  }
 }
 
 // ── 일괄 저장 ──────────────────────────────────────────────────
@@ -1249,12 +1255,8 @@ async function saveAll() {
   var ok = 0, fail = 0;
   for (var idx = 0; idx < targets.length; idx++) {
     var i = APP.rows.indexOf(targets[idx]);
-    try {
-      await saveRow(i);
-      ok++;
-    } catch(err) {
-      fail++;
-    }
+    var success = await saveRow(i, { silent: true });
+    if (success) ok++; else fail++;
     // 진행 상황 버튼에 표시
     if (btn) btn.textContent = '저장 중... ' + (idx+1) + '/' + targets.length;
   }
@@ -1435,209 +1437,6 @@ async function checkNeis(i) {
     alert('[NEIS 검토 결과]\n글자수: ' + d.charCount + '/500\n\n' +
       (d.warnings.length ? d.warnings.join('\n') : '✓ 이상 없음'));
   } catch(e) { toast(e.message, 'error'); }
-}
-
-// ── 검수 뷰 ─────────────────────────────────────────────────
-async function loadReviewList() {
-  // 캐시가 있으면 즉시 렌더링
-  if (APP.cache.loaded) {
-    renderReviewTable(getReviewDataFromCache());
-    return;
-  }
-  // 캐시 없으면 API 호출
-  showLoading('검수 목록 불러오는 중...');
-  var t = APP.teacher;
-  var filters = {
-    year:     document.getElementById('selYear').value,
-    semester: document.getElementById('selSem').value
-  };
-  if (APP.selectedSubject) filters.subjectCode = APP.selectedSubject.subjectCode;
-  if (t.role === '검수' && t.assignedTo) {
-    filters.assignedTeachers = t.assignedTo.split(',').map(s => s.trim()).filter(Boolean);
-  }
-  try {
-    var res = await API.getTransList(filters);
-    hideLoading();
-    renderReviewTable(res.data || []);
-  } catch(e) { hideLoading(); toast(e.message, 'error'); }
-}
-
-function getReviewDataFromCache() {
-  var subjectCode = APP.selectedSubject ? APP.selectedSubject.subjectCode : null;
-  var assignedTeachers = [];
-  var t = APP.teacher;
-  if (t.role === '검수' && t.assignedTo) {
-    assignedTeachers = t.assignedTo.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
-  }
-
-  var results = [];
-  // transMap key = subjectCode|studentName → 최신 레코드만 있음
-  Object.keys(APP.cache.transMap).forEach(function(key) {
-    var rec = APP.cache.transMap[key];
-    // 과목 필터
-    var parts = key.split('|');
-    var recCode = parts[0];
-    if (subjectCode && recCode !== subjectCode) return;
-    // 검수 교사 담당 필터 (teacherName 기준)
-    if (assignedTeachers.length && assignedTeachers.indexOf(rec.teacherName || '') === -1) return;
-
-    results.push({
-      rowIndex:        rec.rowIndex,
-      studentName:     parts[1] || '',
-      studentNameEN:   rec.studentNameEN || '',
-      grade:           rec.grade || '',
-      subjectNameKR:   rec.subjectNameKR || recCode,
-      translatedDraft: rec.translatedDraft || '',
-      finalText:       rec.finalText || '',
-      reviewerComment: rec.reviewerComment || '',
-      status:          rec.status || 'draft'
-    });
-  });
-
-  // 과목 → 학생명 순 정렬
-  results.sort(function(a, b) {
-    if (a.subjectNameKR !== b.subjectNameKR) return a.subjectNameKR.localeCompare(b.subjectNameKR, 'ko');
-    return a.studentName.localeCompare(b.studentName, 'ko');
-  });
-  return results;
-}
-
-function renderReviewTable(data) {
-  var table = document.getElementById('reviewTable');
-  var empty = document.getElementById('emptyReview');
-  if (!data.length) { table.style.display='none'; empty.style.display=''; return; }
-  table.style.display = ''; empty.style.display = 'none';
-
-  document.getElementById('reviewHead').innerHTML =
-    '<tr><th>학생</th><th>영문명</th><th>Gr.</th><th>과목</th>' +
-    '<th style="min-width:220px">번역 초본</th><th style="min-width:220px">최종본</th>' +
-    '<th style="min-width:130px">코멘트</th><th>글자수</th><th>상태</th><th>작업</th></tr>';
-
-  document.getElementById('reviewBody').innerHTML = data.map(r => {
-    var cc = (r.finalText || r.translatedDraft || '').length;
-    var ccCls = cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
-    return `<tr>
-      <td><div class="ci">${e(r.studentName)}</div></td>
-      <td><div class="ci">${e(r.studentNameEN)}</div></td>
-      <td><div class="ci">${r.grade}</div></td>
-      <td><div class="ci" style="font-size:11px">${e(r.subjectNameKR)}</div></td>
-      <td><textarea class="cta drft" id="rv_d_${r.rowIndex}">${e(r.translatedDraft)}</textarea></td>
-      <td><textarea class="cta fnl"  id="rv_f_${r.rowIndex}">${e(r.finalText)}</textarea></td>
-      <td><textarea class="cta cmt"  id="rv_c_${r.rowIndex}">${e(r.reviewerComment)}</textarea></td>
-      <td><div class="cc ${ccCls}">${cc}/500</div></td>
-      <td><div class="ci"><span class="sbadge s-${r.status}">${r.status}</span></div></td>
-      <td class="ca">
-        <button class="btn-tr" onclick="saveReview(${r.rowIndex})">저장</button>
-        <button class="btn-cp" onclick="copyReview(${r.rowIndex})" style="margin-top:3px">NEIS 복사</button>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
-async function saveReview(rowIndex) {
-  var fields = {
-    finalText: document.getElementById('rv_f_' + rowIndex)?.value || '',
-    reviewerComment: document.getElementById('rv_c_' + rowIndex)?.value || '',
-    status: 'reviewed'
-  };
-  try {
-    var res = await API.updateTrans(rowIndex, fields);
-    if (res.success) toast('검수 저장 완료 ✓', 'success');
-    else toast('저장 실패', 'error');
-  } catch(e) { toast(e.message, 'error'); }
-}
-
-function copyReview(rowIndex) {
-  var el = document.getElementById('rv_f_' + rowIndex);
-  if (!el?.value) { toast('최종본이 없습니다.', 'error'); return; }
-  copyToClipboard(el.value);
-  toast('클립보드 복사 완료 ✓', 'success');
-}
-
-// ── 번역 이력 뷰 ────────────────────────────────────────────
-// 이력: 전체를 한 번만 로드, 과목 변경 시 클라이언트 필터링
-var _historyAll  = null;  // 전체 이력 (연도/학기 기준)
-var _historyYear = '';
-var _historySem  = '';
-
-async function loadHistoryList() {
-  var year = document.getElementById('selYear').value;
-  var sem  = document.getElementById('selSem').value;
-
-  // 연도/학기가 같으면 전체 재호출 없이 클라이언트 필터링
-  if (_historyAll && _historyYear === year && _historySem === sem) {
-    renderHistoryTable(filterHistory(_historyAll));
-    return;
-  }
-
-  showLoading('이력 불러오는 중...');
-  var t = APP.teacher;
-  var filters = { year: year, semester: sem };
-  if (t.role === '검수' && t.assignedTo) {
-    filters.assignedTeachers = t.assignedTo.split(',').map(s => s.trim()).filter(Boolean);
-  }
-  try {
-    var res = await API.getTransHistory(filters);
-    hideLoading();
-    _historyAll  = res.data || [];
-    _historyYear = year;
-    _historySem  = sem;
-    renderHistoryTable(filterHistory(_historyAll));
-  } catch(e) { hideLoading(); toast(e.message, 'error'); }
-}
-
-function filterHistory(data) {
-  var subjectCode = APP.selectedSubject ? APP.selectedSubject.subjectCode : '';
-  if (!subjectCode) return data;
-  return data.filter(function(r) { return r.subjectCode === subjectCode; });
-}
-
-function renderHistoryTable(data) {
-  var wrap = document.getElementById('historyContent');
-  if (!data.length) {
-    wrap.innerHTML = '<div class="empty-state"><div class="eicon">📋</div><p>이력이 없습니다.</p></div>';
-    return;
-  }
-
-  // 학생별 그룹핑
-  var groups = {};
-  var groupOrder = [];
-  data.forEach(function(r) {
-    var key = r.subjectNameKR + ' | ' + r.studentName;
-    if (!groups[key]) { groups[key] = []; groupOrder.push(key); }
-    groups[key].push(r);
-  });
-
-  wrap.innerHTML = groupOrder.map(function(key) {
-    var rows = groups[key];
-    var first = rows[0];
-    return '<div style="margin-bottom:16px;border:1px solid var(--border);border-radius:8px;overflow:hidden">' +
-      '<div style="background:var(--bg3);padding:8px 12px;font-size:12px;font-weight:600;color:var(--text)">' +
-        e(first.subjectNameKR) + ' — ' + e(first.studentName) + ' (' + e(first.studentNameEN) + ')' +
-        ' <span style="font-size:11px;color:var(--gray);font-weight:400">총 ' + rows.length + '건</span>' +
-      '</div>' +
-      '<table class="sheet" style="width:100%"><thead><tr>' +
-        '<th style="width:8%">저장일시</th><th style="width:5%">저장자</th>' +
-        '<th style="width:22%">번역 초본</th><th style="width:22%">최종본</th>' +
-        '<th style="width:15%">코멘트</th><th style="width:5%">글자수</th><th style="width:5%">상태</th>' +
-      '</tr></thead><tbody>' +
-      rows.map(function(r) {
-        var cc = (r.finalText || r.translatedDraft || '').length;
-        var ccCls = cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
-        var date = r.createdAt ? new Date(r.createdAt).toLocaleString('ko-KR',
-          {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
-        return '<tr>' +
-          '<td><div class="ci" style="font-size:10px">' + date + '</div></td>' +
-          '<td><div class="ci" style="font-size:11px">' + e(r.updatedBy||r.teacherName) + '</div></td>' +
-          '<td><div class="cta drft" style="min-height:40px;background:#f8fafc;padding:6px;font-size:11px;overflow:auto">' + e(r.translatedDraft) + '</div></td>' +
-          '<td><div class="cta fnl"  style="min-height:40px;padding:6px;font-size:11px;overflow:auto">' + e(r.finalText) + '</div></td>' +
-          '<td><div style="padding:6px;font-size:11px;color:var(--text2)">' + e(r.reviewerComment) + '</div></td>' +
-          '<td><div class="cc ' + ccCls + '">' + (cc||'-') + '</div></td>' +
-          '<td><div class="ci"><span class="sbadge s-' + r.status + '">' + r.status + '</span></div></td>' +
-        '</tr>';
-      }).join('') +
-      '</tbody></table></div>';
-  }).join('');
 }
 
 // ── 관리 뷰 ─────────────────────────────────────────────────

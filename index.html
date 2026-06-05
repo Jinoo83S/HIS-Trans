@@ -231,10 +231,22 @@ body::before { content: ''; position: fixed; inset: 0;
       n.toLowerCase().includes(val.toLowerCase())
     );
     if (!filtered.length) { list.classList.remove('open'); return; }
-    list.innerHTML = filtered.map((n, i) =>
-      `<div class="ac-item" data-name="${n}" onmousedown="selectName('${n}')">${n}</div>`
-    ).join('');
+    renderAcList(filtered);
     list.classList.add('open');
+  }
+
+  // 자동완성 항목을 DOM으로 안전하게 생성 (XSS 방지)
+  function renderAcList(names) {
+    var list = document.getElementById('acList');
+    list.innerHTML = '';
+    names.forEach(function(n) {
+      var div = document.createElement('div');
+      div.className = 'ac-item';
+      div.dataset.name = n;
+      div.textContent = n;                       // textContent로 HTML 무력화
+      div.addEventListener('mousedown', function() { selectName(n); });
+      list.appendChild(div);
+    });
   }
 
   function toggleAcList() {
@@ -263,9 +275,7 @@ body::before { content: ''; position: fixed; inset: 0;
       ? _allNames.filter(n => n.toLowerCase().includes(cur))
       : _allNames;
     if (!names.length) return;
-    list.innerHTML = names.map(n =>
-      `<div class="ac-item" data-name="${n}" onmousedown="selectName('${n}')">${n}</div>`
-    ).join('');
+    renderAcList(names);
     list.classList.add('open');
   }
 
