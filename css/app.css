@@ -122,6 +122,8 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance
 .sheet tbody td.col-cmt   { background: #fafafa; }
 .ci { padding: 6px 4px; color: var(--text); font-size: 12px; text-align: center;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 상태 칸은 배지+버튼이 세로로 쌓이므로 줄바꿈 허용 */
+.col-status .ci { white-space: normal; overflow: visible; text-overflow: clip; }
 .ci-neis { color: var(--primary); font-weight: 600; font-size: 11px; }
 .cta { width: 100%; min-height: 76px; background: transparent; border: none; outline: none;
   color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 12px;

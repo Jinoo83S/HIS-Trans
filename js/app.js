@@ -931,10 +931,6 @@ function rowHtml(r, i, role) {
         ${r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : ''}">
         저장
       </button>
-      <button class="btn-cp" onclick="copyFinal(${i})"
-        style="margin-top:3px;width:100%">
-        복사
-      </button>
     </div></td>
   </tr>`;
 }
