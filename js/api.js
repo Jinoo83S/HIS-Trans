@@ -84,6 +84,8 @@ var API = (function() {
     saveApiKeys:        (openai, anthropic, gemini) => call('saveApiKeys', { openaiKey: openai, anthropicKey: anthropic, geminiKey: gemini }),
     checkApiKeys:       ()                      => call('checkApiKeys'),
     deleteApiKey:       (which)                 => call('deleteApiKey', { which }),
+    getTokenStats:      (filters)               => call('getTokenStats', { filters }),
+    clearTokenStats:    ()                      => call('clearTokenStats'),
     getModels:          ()                      => call('getModels'),
   };
 })();

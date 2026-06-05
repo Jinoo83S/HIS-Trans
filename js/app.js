@@ -1846,6 +1846,88 @@ async function saveNeisRules() {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+// ── 관리자: 토큰 사용량 ───────────────────────────────────────
+async function openTokenStats() {
+  document.getElementById('tokenStatsOverlay').classList.add('open');
+  var body = document.getElementById('tokenStatsBody');
+  body.innerHTML = '불러오는 중...';
+  try {
+    var res = await API.getTokenStats();
+    if (!res.success) { body.innerHTML = '오류: ' + e(res.error); return; }
+    var d = res.data;
+    if (!d.summary || !d.summary.totalCalls) {
+      body.innerHTML = '<p style="color:var(--gray)">아직 기록된 토큰 사용량이 없습니다.</p>';
+      return;
+    }
+    var s = d.summary;
+    var html = '';
+    // 총계 카드
+    html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">' +
+      tokenCard('총 호출', s.totalCalls.toLocaleString() + '회', '#2563eb') +
+      tokenCard('입력 토큰', s.totalIn.toLocaleString(), '#16a34a') +
+      tokenCard('출력 토큰', s.totalOut.toLocaleString(), '#d97706') +
+      tokenCard('캐시 절약', s.totalCache.toLocaleString(), '#7c3aed') +
+      '</div>';
+
+    // 엔진별
+    html += '<div style="font-weight:700;margin:10px 0 6px">엔진별</div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">' +
+      '<tr style="background:var(--bg3)"><th style="padding:6px;text-align:left">엔진</th>' +
+      '<th style="padding:6px;text-align:right">호출</th><th style="padding:6px;text-align:right">입력</th>' +
+      '<th style="padding:6px;text-align:right">출력</th><th style="padding:6px;text-align:right">캐시읽기</th></tr>';
+    Object.keys(d.byEngine).forEach(function(eng) {
+      var x = d.byEngine[eng];
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:6px">' + e(eng||'-') + '</td>' +
+        '<td style="padding:6px;text-align:right">' + x.calls.toLocaleString() + '</td>' +
+        '<td style="padding:6px;text-align:right">' + x.input.toLocaleString() + '</td>' +
+        '<td style="padding:6px;text-align:right">' + x.output.toLocaleString() + '</td>' +
+        '<td style="padding:6px;text-align:right;color:#7c3aed">' + x.cacheRead.toLocaleString() + '</td></tr>';
+    });
+    html += '</table>';
+
+    // 교사별
+    html += '<div style="font-weight:700;margin:10px 0 6px">교사별</div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">' +
+      '<tr style="background:var(--bg3)"><th style="padding:6px;text-align:left">교사</th>' +
+      '<th style="padding:6px;text-align:right">호출</th><th style="padding:6px;text-align:right">입력</th>' +
+      '<th style="padding:6px;text-align:right">출력</th></tr>';
+    Object.keys(d.byTeacher).sort(function(a,b){return d.byTeacher[b].input - d.byTeacher[a].input;}).forEach(function(tc) {
+      var x = d.byTeacher[tc];
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:6px">' + e(tc||'-') + '</td>' +
+        '<td style="padding:6px;text-align:right">' + x.calls.toLocaleString() + '</td>' +
+        '<td style="padding:6px;text-align:right">' + x.input.toLocaleString() + '</td>' +
+        '<td style="padding:6px;text-align:right">' + x.output.toLocaleString() + '</td></tr>';
+    });
+    html += '</table>';
+
+    html += '<p style="font-size:11px;color:var(--gray);line-height:1.6">' +
+      '※ 캐시읽기 토큰은 prompt caching으로 재사용되어 비용이 1/10로 청구됩니다.<br>' +
+      '※ 토큰 수는 추정 참고용이며 실제 청구는 각 AI 제공사 대시보드를 확인하세요.</p>';
+
+    body.innerHTML = html;
+  } catch(err) { body.innerHTML = '오류: ' + e(err.message); }
+}
+
+function tokenCard(label, value, color) {
+  return '<div style="flex:1;min-width:120px;padding:12px;background:var(--bg3);border-radius:8px;' +
+    'border-left:3px solid ' + color + '">' +
+    '<div style="font-size:11px;color:var(--gray)">' + label + '</div>' +
+    '<div style="font-size:18px;font-weight:700;color:' + color + ';margin-top:2px">' + value + '</div></div>';
+}
+
+async function clearTokenStatsConfirm() {
+  if (!confirm('토큰 사용 기록을 모두 삭제하시겠습니까?\n(번역 데이터는 영향 없음)')) return;
+  try {
+    var res = await API.clearTokenStats();
+    if (res.success) {
+      toast(res.deleted + '건 삭제 완료 ✓', 'success');
+      openTokenStats();
+    } else toast('삭제 실패: ' + res.error, 'error');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
 // ── 관리자: 입력 데이터 초기화 ────────────────────────────────
 function openClearDataModal() {
   document.getElementById('clearConfirm').value = '';
