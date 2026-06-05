@@ -10,7 +10,7 @@
 //   기존처럼 사용자가 🔗 URL 버튼으로 입력/변경할 수 있습니다.
 // ============================================================
 
-var FIXED_GAS_URL = '';  // ← 운영 시 여기에 GAS URL 입력
+var FIXED_GAS_URL = 'https://script.google.com/a/macros/his.sc.kr/s/AKfycbyx3wsdyUIIOWehGklDWjpUGRcbNFWk3t7aWx7TLevv03G09n_KI2nWAPjjARjrnSEy_g/exec';  // ← 운영 시 여기에 GAS URL 입력
 
 var Config = (function() {
   var KEY = 'his_gas_url';
