@@ -1193,6 +1193,7 @@ async function saveRow(i, opts) {
       translatedDraft: row.translatedDraft,
       finalText:       row.finalText,
       aiFinal:         row.aiFinal,
+      aiMemo:          row.aiMemo,
       reviewerComment: row.comment,
       status:          saveStatus
     };
@@ -1210,6 +1211,7 @@ async function saveRow(i, opts) {
           translatedDraft: row.translatedDraft,
           finalText:       row.finalText,
           reviewedText:    row.aiFinal,
+          aiMemo:          row.aiMemo,
           reviewerComment: row.comment,
           status:          row.status
         };
