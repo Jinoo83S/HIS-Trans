@@ -1268,64 +1268,87 @@ async function saveAll() {
 function downloadExcel() {
   if (!APP.rows || !APP.rows.length) { toast('다운로드할 데이터가 없습니다.', 'error'); return; }
   if (!APP.selectedSubject) { toast('과목을 선택하세요.', 'error'); return; }
+  if (typeof XLSX === 'undefined') { toast('엑셀 라이브러리 로드 실패. 새로고침 후 다시 시도하세요.', 'error'); return; }
 
   var year = document.getElementById('selYear').value;
   var sem  = document.getElementById('selSem').value;
   var subj = APP.selectedSubject;
-  var TAB  = '\t';
-  var CRLF = '\r\n';
 
   var headers = ['학년도','학기','학년','학생개인번호','과목','과목코드',
-    '반/번호','성명','학적변동  구분','세부능력 및 특기사항',
-    '영재\u00b7발명교육 기록사항','유의어  점검내역'];
+    '반/번호','성명','학적변동\r\n구분','세부능력 및 특기사항',
+    '영재\u00b7발명교육 기록사항','유의어\r\n점검내역'];
 
-  var rows = [headers];
-
+  // 데이터 2차원 배열 (학생당 2행: 데이터행 + 빈행)
+  var aoa = [headers];
   APP.rows.forEach(function(r) {
-    var s        = r.student;
+    var s         = r.student;
     var neisClass = s.neisClass || s.class  || '';
     var neisNo    = s.neisNo    || s.number || '';
     var hanBan    = (neisClass && neisNo) ? neisClass + '/' + neisNo : '';
     var finalTxt  = r.finalText || r.translatedDraft || '';
-
-    rows.push([
+    aoa.push([
       year, sem, s.grade || '', s.neis || '',
-      subj.nameKR, '', hanBan, s.name || '',
-      '재학', finalTxt, '',
-      finalTxt ? '없음' : ''
+      subj.nameKR, subj.subjectCode || '', hanBan, s.name || '',
+      '재학', finalTxt, '', finalTxt ? '없음' : ''
     ]);
-    rows.push(['','','','','','','','','','','','']);
+    aoa.push(['','','','','','','','','','','','']);
   });
 
-  function escCell(cell) {
-    var v = String(cell == null ? '' : cell);
-    if (v.indexOf(TAB) !== -1 || v.indexOf('\n') !== -1 || v.indexOf('"') !== -1) {
-      return '"' + v.replace(/"/g, '""') + '"';
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // 열 너비 (템플릿과 동일)
+  ws['!cols'] = [
+    {wch:7.1},{wch:7.1},{wch:7.1},{wch:11.4},{wch:7.1},{wch:7.1},
+    {wch:15.4},{wch:21.1},{wch:12.0},{wch:42.9},{wch:28.6},{wch:14.3}
+  ];
+
+  // 학생당 2행 세로 병합 (모든 열) — 데이터행과 빈행을 합침
+  var merges = [];
+  var nStudents = APP.rows.length;
+  for (var si = 0; si < nStudents; si++) {
+    var topRow = 1 + si * 2;       // 0-based: 헤더(0) 다음부터
+    for (var c = 0; c < 12; c++) {
+      merges.push({ s:{r:topRow, c:c}, e:{r:topRow+1, c:c} });
     }
-    return v;
+  }
+  ws['!merges'] = merges;
+
+  // 서식 적용
+  var thin = { style:'thin', color:{rgb:'000000'} };
+  var border = { top:thin, bottom:thin, left:thin, right:thin };
+  var lastRow = aoa.length;
+  for (var R = 0; R < lastRow; R++) {
+    for (var C = 0; C < 12; C++) {
+      var addr = XLSX.utils.encode_cell({r:R, c:C});
+      if (!ws[addr]) ws[addr] = { t:'s', v:'' };
+      var isHeader = (R === 0);
+      ws[addr].s = {
+        font: { sz: 11, name: '맑은 고딕' },
+        alignment: {
+          horizontal: isHeader ? 'center' : (C === 9 ? 'left' : 'center'),
+          vertical: 'center',
+          wrapText: true
+        },
+        border: border,
+        fill: isHeader ? { fgColor:{rgb:'DDDDDD'} } : undefined
+      };
+    }
   }
 
-  var tsv = rows.map(function(r) {
-    return r.map(escCell).join(TAB);
-  }).join(CRLF);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '과목별세부능력및특기사항');
 
-  var bom  = '\uFEFF';
-  var blob = new Blob([bom + tsv], { type: 'text/tab-separated-values;charset=utf-8' });
-  var url  = URL.createObjectURL(blob);
-  var a    = document.createElement('a');
-
-  var now   = new Date();
-  function pad(n) { return String(n).padStart(2, '0'); }
+  var now = new Date();
+  function pad(n) { return String(n).padStart(2,'0'); }
   var stamp = now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()) +
               pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());
   var grade = APP.rows[0] ? APP.rows[0].student.grade : '';
   var cls   = APP.rows[0] ? (APP.rows[0].student.neisClass || APP.rows[0].student.class) : '';
-  a.download = year + '_' + sem + '학기_' + grade + '학년_' + cls + '_' +
-               subj.nameKR + '_과목세특_' + stamp + '.tsv';
-  a.href = url;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast('다운로드 완료 ✓', 'success');
+  var fname = year + '_' + sem + '학기_' + grade + '학년_' + cls + '_' +
+              subj.nameKR + '_과목세특_' + stamp + '.xlsx';
+
+  XLSX.writeFile(wb, fname);
+  toast('엑셀 다운로드 완료 ✓', 'success');
 }
 
 // ── NEIS 검토 ────────────────────────────────────────────────
