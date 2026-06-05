@@ -1658,11 +1658,22 @@ function renderTeacherTable() {
   var data = _teacherData;
   var translators = data.filter(t => t.role === '번역').map(t => t.name);
 
+  // 번역교사 → 담당 검수교사 역매핑 (검수교사의 assignedTo에서 추출)
+  var reviewerOf = {}; // 번역교사명 → [검수교사명...]
+  data.forEach(function(t) {
+    if (t.role === '검수' && t.assignedTo) {
+      t.assignedTo.split(',').map(function(s){return s.trim();}).filter(Boolean).forEach(function(tr) {
+        if (!reviewerOf[tr]) reviewerOf[tr] = [];
+        reviewerOf[tr].push(t.name);
+      });
+    }
+  });
+
   var html = '<div class="admin-section">' +
     '<h4>👥 교사 권한 관리</h4>' +
     '<table class="sheet" style="min-width:100%"><thead><tr>' +
     '<th>이름</th><th>Full Name</th><th>이메일</th><th>홈룸</th>' +
-    '<th>동아리</th><th>권한</th><th>번역담당</th><th style="min-width:120px">변경</th>' +
+    '<th>동아리</th><th>권한</th><th>번역담당</th><th style="width:70px">삭제</th>' +
     '</tr></thead><tbody>' +
     data.map(t => {
       var nameKey = t.name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
@@ -1682,16 +1693,24 @@ function renderTeacherTable() {
           </select>
         </div></td>
         <td><div class="ci" id="assignWrap_${nameKey}" style="min-width:160px">
-          ${isReviewer ? buildAssignDropdown(nameKey, translators, t.assignedTo||'') : '<span style="color:var(--gray);font-size:11px">-</span>'}
+          ${isReviewer
+            ? buildAssignDropdown(nameKey, translators, t.assignedTo||'')
+            : (t.role === '번역'
+                ? (reviewerOf[t.name]
+                    ? '<span style="font-size:11px;color:#166534">검수: ' + e(reviewerOf[t.name].join(', ')) + '</span>'
+                    : '<span style="font-size:11px;color:var(--gray)">검수자 미지정</span>')
+                : '<span style="color:var(--gray);font-size:11px">-</span>')}
         </div></td>
-        <td class="ca"><div style="display:flex;gap:4px">
-          <button class="btn-tr" onclick="saveTeacher('${nameKey}','${t.name}')" style="flex:1">저장</button>
+        <td class="ca">
           <button class="btn-cp" onclick="deleteTeacherRow('${t.name}')"
-            style="flex:1;background:#fee2e2;border-color:#fca5a5;color:var(--red)">삭제</button>
-        </div></td>
+            style="background:#fee2e2;border-color:#fca5a5;color:var(--red)">삭제</button>
+        </td>
       </tr>`;
     }).join('') +
-    '</tbody></table></div>' +
+    '</tbody></table>' +
+    '<div style="text-align:right;margin-top:10px">' +
+    '<button class="btn-teal" onclick="saveAllTeachers()" style="padding:8px 24px">💾 전체 저장</button>' +
+    '</div></div>' +
 
     // 교사 추가
     '<div class="admin-section"><h4>➕ 교사 추가</h4>' +
@@ -1727,14 +1746,34 @@ function updateRoleColor(sel) {
   sel.className = 'role-sel role-sel-' + sel.value;
 }
 
-async function saveTeacher(nameKey, name) {
-  var role = document.getElementById('role_' + nameKey)?.value;
-  var assigned = getAssignedValues(nameKey);
-  try {
-    var res = await API.updateTeacherRole(name, role, assigned);
-    if (res.success) { toast(name + ' 저장 완료 ✓', 'success'); loadTeacherList(); }
-    else toast('저장 실패', 'error');
-  } catch(err) { toast(err.message, 'error'); }
+async function saveAllTeachers() {
+  var updates = [];
+  _teacherData.forEach(function(t) {
+    var nameKey = t.name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
+    var roleEl = document.getElementById('role_' + nameKey);
+    if (!roleEl) return;
+    var role = roleEl.value;
+    var assigned = getAssignedValues(nameKey);
+    // 변경된 것만 저장 (권한 or 번역담당이 기존과 다르면)
+    if (role !== t.role || (assigned || '') !== (t.assignedTo || '')) {
+      updates.push({ name: t.name, role: role, assigned: assigned });
+    }
+  });
+
+  if (!updates.length) { toast('변경된 내용이 없습니다.', 'success'); return; }
+
+  toast(updates.length + '건 저장 중...', 'success');
+  var failed = 0;
+  for (var i = 0; i < updates.length; i++) {
+    var u = updates[i];
+    try {
+      var res = await API.updateTeacherRole(u.name, u.role, u.assigned);
+      if (!res.success) failed++;
+    } catch(e) { failed++; }
+  }
+  if (failed === 0) toast(updates.length + '건 저장 완료 ✓', 'success');
+  else toast((updates.length - failed) + '건 저장, ' + failed + '건 실패', 'error');
+  loadTeacherList();
 }
 
 async function deleteTeacherRow(name) {
@@ -1822,10 +1861,16 @@ document.addEventListener('click', function(ev) {
   }
 });
 
-// changeRole은 saveTeacher로 대체되었으나 하위호환 유지
+// 단일 교사 권한 저장 (하위호환)
 async function changeRole(name) {
   var nameKey = name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
-  await saveTeacher(nameKey, name);
+  var role = document.getElementById('role_' + nameKey)?.value;
+  var assigned = getAssignedValues(nameKey);
+  try {
+    var res = await API.updateTeacherRole(name, role, assigned);
+    if (res.success) { toast(name + ' 저장 완료 ✓', 'success'); loadTeacherList(); }
+    else toast('저장 실패', 'error');
+  } catch(err) { toast(err.message, 'error'); }
 }
 
 function renderAdminTab() {
