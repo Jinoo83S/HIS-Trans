@@ -171,9 +171,21 @@ function loadSettings(cb) {
       var eng = document.getElementById('selEngine');
       var mdl = document.getElementById('selModel');
       var crt = document.getElementById('slCreat');
-      if (eng) eng.value = res.data.engine || 'claude';
-      onEngineChange();
-      if (mdl) mdl.value = res.data.model || 'claude-opus-4-8';
+      var savedEngine = res.data.engine || 'claude';
+      var savedModel  = res.data.model  || 'claude-opus-4-8';
+
+      if (eng) eng.value = savedEngine;
+      onEngineChange(); // 엔진에 맞는 모델 옵션 채움
+
+      // 저장된 모델이 옵션에 없으면 강제 추가 후 적용
+      if (mdl) {
+        if (savedModel && APP.models[savedEngine] &&
+            APP.models[savedEngine].indexOf(savedModel) === -1) {
+          APP.models[savedEngine].push(savedModel);
+          onEngineChange();
+        }
+        mdl.value = savedModel;
+      }
       if (crt) { crt.value = res.data.creativity || '0.3';
         var vc = document.getElementById('vCreat'); if (vc) vc.textContent = crt.value; }
       // 엔진 설정: 관리자 외 비활성화 (읽기전용 표시)
@@ -2149,7 +2161,7 @@ async function saveSettingsModal() {
     if (res.success) {
       toast('설정 저장 완료 ✓', 'success');
       closeModal('settingsOverlay');
-      loadSettings();
+      await new Promise(function(resolve){ loadSettings(resolve); }); // 상단바 갱신 완료까지 대기
     } else toast('저장 실패: ' + res.error, 'error');
   } catch(e) { toast(e.message, 'error'); }
 }
