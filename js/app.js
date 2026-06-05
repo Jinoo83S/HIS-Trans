@@ -675,12 +675,15 @@ async function saveAllAiDraft() {
   var btn = document.getElementById('btnSaveAll');
   if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
   var ok = 0, fail = 0;
+  showSaving('저장 중... 0/' + targets.length);
   for (var idx = 0; idx < targets.length; idx++) {
     var i = APP.rows.indexOf(targets[idx]);
     var success = await saveRow(i, { keepAiDraft: true, silent: true });
     if (success) ok++; else fail++;
+    showSaving('저장 중... ' + (idx+1) + '/' + targets.length);
     if (btn) btn.textContent = '저장 중... ' + (idx+1) + '/' + targets.length;
   }
+  hideSaving();
   if (btn) { btn.disabled = false; btn.textContent = '💾 일괄 저장'; }
   toast('저장 완료: ' + ok + '건' + (fail ? ', ' + fail + '건 실패' : '') + ' ✓', fail ? 'error' : 'success');
   renderTable();
@@ -706,6 +709,18 @@ function hideProgress() {
 function cancelProgress() {
   APP.progressCancelled = true;
   hideProgress();
+}
+
+// 저장 진행 오버레이
+function showSaving(text) {
+  var el = document.getElementById('saveText');
+  if (el) el.textContent = text || '저장 중...';
+  var ov = document.getElementById('saveOverlay');
+  if (ov) ov.classList.add('open');
+}
+function hideSaving() {
+  var ov = document.getElementById('saveOverlay');
+  if (ov) ov.classList.remove('open');
 }
 
 // ── 테이블 렌더링 ────────────────────────────────────────────
@@ -1160,6 +1175,7 @@ async function saveRow(i, opts) {
   var s = APP.selectedSubject;
   if (!s) { if (!opts.silent) toast('과목을 선택하세요.', 'error'); return false; }
 
+  if (!opts.silent) showSaving('저장 중...');
   try {
     var res;
     // 저장 시 상태 결정
@@ -1233,6 +1249,8 @@ async function saveRow(i, opts) {
   } catch(e) {
     if (!opts.silent) toast(e.message, 'error');
     return false;
+  } finally {
+    if (!opts.silent) hideSaving();
   }
 }
 
@@ -1251,13 +1269,15 @@ async function saveAll() {
   if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
 
   var ok = 0, fail = 0;
+  showSaving('저장 중... 0/' + targets.length);
   for (var idx = 0; idx < targets.length; idx++) {
     var i = APP.rows.indexOf(targets[idx]);
     var success = await saveRow(i, { silent: true });
     if (success) ok++; else fail++;
-    // 진행 상황 버튼에 표시
+    showSaving('저장 중... ' + (idx+1) + '/' + targets.length);
     if (btn) btn.textContent = '저장 중... ' + (idx+1) + '/' + targets.length;
   }
+  hideSaving();
 
   if (btn) { btn.disabled = false; btn.textContent = '💾 일괄 저장'; }
   toast('일괄 저장 완료: ' + ok + '건 성공' + (fail ? ', ' + fail + '건 실패' : '') + ' ✓', fail ? 'error' : 'success');
