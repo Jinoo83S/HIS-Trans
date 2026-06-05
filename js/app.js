@@ -472,15 +472,16 @@ function renderInputTable() {
   }
   table.style.display = ''; empty.style.display = 'none';
 
-  // colgroup
+  // colgroup (Translate / Save 열 분리)
   var cols = '<colgroup>' +
     '<col style="width:7%">' +   // Name EN
     '<col style="width:6%">' +   // 이름
     '<col style="width:3.5%">' + // Gr
     '<col style="width:3.5%">' + // Cls
     '<col style="width:5%">' +   // NEIS
-    '<col style="width:64%">' +  // 원문 입력 (확대)
-    '<col style="width:11%">' +  // 상태/저장
+    '<col style="width:57%">' +  // Source
+    '<col style="width:9%">' +   // Translate
+    '<col style="width:9%">' +   // Save
     '</colgroup>';
   var existing = table.querySelector('colgroup');
   if (existing) existing.remove();
@@ -488,7 +489,7 @@ function renderInputTable() {
 
   head.innerHTML = '<tr>' +
     '<th>Name (EN)</th><th>이름</th><th>Gr.</th><th>Cls.</th><th>NEIS</th>' +
-    '<th class="ths">원문 입력 (Source)</th><th>저장</th></tr>';
+    '<th class="ths">Source</th><th>Translate</th><th>Save</th></tr>';
 
   body.innerHTML = APP.rows.map(function(r, i) {
     var s = r.student;
@@ -499,11 +500,15 @@ function renderInputTable() {
       '<td><div class="ci">' + s.class + '</div></td>' +
       '<td><div class="ci ci-neis">' + e(s.neis||s.neisClass||'') + '</div></td>' +
       '<td><textarea class="cta src" oninput="onInputSourceChange(' + i + ',this.value);autoResize(this)">' + e(r.sourceText) + '</textarea></td>' +
+      '<td class="ca"><button class="btn-teal" onclick="pipelineRow(' + i + ')" ' +
+        (r.translating ? 'disabled' : '') +
+        ' style="width:100%;font-size:11px;padding:6px 4px">' +
+        (r.translating ? '⏳' : '▶ Translate') + '</button></td>' +
       '<td><div class="ci" style="padding:5px 4px;display:flex;flex-direction:column;gap:5px;align-items:stretch">' +
         '<div style="text-align:center">' + buildInputStatus(r) + '</div>' +
         '<button class="btn-tr" onclick="saveRow(' + i + ')" ' +
         'style="width:100%;' +
-        (r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : '') + '">💾 저장</button>' +
+        (r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : '') + '">💾 Save</button>' +
       '</div></td>' +
     '</tr>';
   }).join('');
@@ -511,14 +516,18 @@ function renderInputTable() {
 }
 
 function buildInputStatus(r) {
-  if (!r.sourceText) return '<span class="sbadge s-draft">미입력</span>';
+  if (!r.sourceText) return '<span class="sbadge s-draft">No input</span>';
   var warn = '';
   if (r.sourceText.trim().length > SOURCE_WARN_LEN) {
-    warn = '<div style="font-size:9px;color:var(--red);margin-top:2px" title="원문이 너무 깁니다">⚠️ ' +
-      r.sourceText.trim().length + '자</div>';
+    warn = '<div style="font-size:9px;color:var(--red);margin-top:2px" title="Source text is too long">⚠️ ' +
+      r.sourceText.trim().length + ' chars</div>';
   }
-  if (r._dirty || !r.rowIndex) return '<span style="font-size:10px;font-weight:700;color:var(--red)">● 미저장</span>' + warn;
-  return '<span class="sbadge s-reviewed">입력완료</span>' + warn;
+  if (r._dirty || !r.rowIndex) return '<span style="font-size:10px;font-weight:700;color:var(--red)">● Unsaved</span>' + warn;
+  // 저장됐지만 번역 결과가 없음 → 경고
+  if (!r.finalText && !r.translatedDraft) {
+    return '<span class="sbadge" style="background:#fef3c7;color:#92400e">⚠️ Not translated</span>' + warn;
+  }
+  return '<span class="sbadge s-reviewed">Saved</span>' + warn;
 }
 
 function onInputSourceChange(i, val) {
@@ -528,7 +537,7 @@ function onInputSourceChange(i, val) {
   if (cell) cell.innerHTML =
     '<div style="text-align:center">' + buildInputStatus(APP.rows[i]) + '</div>' +
     '<button class="btn-tr" onclick="saveRow(' + i + ')" ' +
-    'style="width:100%;background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700">💾 저장</button>';
+    'style="width:100%;background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700">💾 Save</button>';
 }
 
 // ── 2단계 파이프라인 (단일 행) ────────────────────────────────
@@ -570,7 +579,8 @@ async function pipelineRow(i) {
     if (res.memo) row.aiMemo = res.memo;
     row.status = 'ai_draft';  // AI 생성 → 검수 전 상태
     row._dirty = true;
-    refreshRow(i);
+    if (APP.currentView === 'input') renderInputTable();
+    else refreshRow(i);
     setTimeout(hideProgress, 400);
     toast('번역 완료 ✓', 'success');
   } catch(err) {
@@ -736,10 +746,10 @@ function renderTable() {
   table.style.display = '';
   empty.style.display = 'none';
 
-  // 저장된 열 너비 적용 (없으면 기본값)
-  var defaultWidths = ['6%','4%','2.5%','2.5%','4%','21%','3%','21%','21%','3%','7%','3%','5%'];
+  // 저장된 열 너비 적용 (없으면 기본값) — 12열 (번역 ▶ 열 제거됨)
+  var defaultWidths = ['6%','4%','2.5%','2.5%','4%','22%','22%','22%','3%','7%','3%','5%'];
   var savedWidths = loadColWidths();
-  var widths = savedWidths || defaultWidths;
+  var widths = (savedWidths && savedWidths.length === 12) ? savedWidths : defaultWidths;
   var colsInfo = '<colgroup>' +
     widths.map(function(w){ return '<col style="width:' + w + '">'; }).join('') +
     '</colgroup>';
@@ -755,7 +765,6 @@ function renderTable() {
     '<th>이름</th>' +
     '<th>Gr.</th><th>Cls.</th><th>NEIS</th>' +
     '<th class="ths">Source (원문)</th>' +
-    '<th>번역</th>' +
     '<th class="tht">번역 초본</th>' +
     '<th class="thf">최종본</th>' +
     '<th>검토</th>' +
@@ -897,15 +906,6 @@ function rowHtml(r, i, role) {
     <td class="col-info"><div class="ci ci-neis">${e(s.neis||s.neisClass||'')}</div></td>
     <td><textarea class="cta src" readonly
       style="color:var(--text2)">${e(r.sourceText)}</textarea></td>
-    <td class="ca">
-      <button class="btn-arrow" onclick="pipelineRow(${i})" title="번역"
-        ${r.translating?'disabled':''} style="font-size:16px;background:none;border:none;
-        cursor:pointer;color:var(--teal);padding:4px;transition:transform 0.15s"
-        onmouseover="this.style.transform='scale(1.3)'"
-        onmouseout="this.style.transform='scale(1)'">
-        ${r.translating ? '⏳' : '▶'}
-      </button>
-    </td>
     <td class="col-draft">
       <textarea class="cta drft" readonly id="drft_${i}"
         style="color:var(--text2)">${e(r.translatedDraft)}</textarea>
