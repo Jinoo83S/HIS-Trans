@@ -170,27 +170,34 @@ function loadSettings(cb) {
       // 엔진/모델/creativity 기본값 적용
       var eng = document.getElementById('selEngine');
       var mdl = document.getElementById('selModel');
+      var mdl2 = document.getElementById('selModel2');
       var crt = document.getElementById('slCreat');
       var savedEngine = res.data.engine || 'claude';
       var savedModel  = res.data.model  || 'claude-opus-4-8';
+      // 단계별 모델: 설정값 없으면 공통 모델로 폴백
+      var savedStep1  = res.data.step1Model || savedModel;
+      var savedStep2  = res.data.step2Model || savedModel;
 
       if (eng) eng.value = savedEngine;
-      onEngineChange(); // 엔진에 맞는 모델 옵션 채움
+      onEngineChange(); // 엔진에 맞는 모델 옵션 채움 (selModel, selModel2 둘 다)
 
       // 저장된 모델이 옵션에 없으면 강제 추가 후 적용
-      if (mdl) {
-        if (savedModel && APP.models[savedEngine] &&
-            APP.models[savedEngine].indexOf(savedModel) === -1) {
-          APP.models[savedEngine].push(savedModel);
+      function ensureModel(m) {
+        if (m && APP.models[savedEngine] && APP.models[savedEngine].indexOf(m) === -1) {
+          APP.models[savedEngine].push(m);
           onEngineChange();
         }
-        mdl.value = savedModel;
       }
+      ensureModel(savedStep1);
+      ensureModel(savedStep2);
+      if (mdl)  mdl.value  = savedStep1;  // ①번역 모델
+      if (mdl2) mdl2.value = savedStep2;  // ②세특 모델
+
       if (crt) { crt.value = res.data.creativity || '0.3';
         var vc = document.getElementById('vCreat'); if (vc) vc.textContent = crt.value; }
       // 엔진 설정: 관리자 외 비활성화 (읽기전용 표시)
       var isAdmin = APP.teacher.role === '관리자';
-      [eng, mdl, crt].forEach(function(el) { if (el) el.disabled = !isAdmin; });
+      [eng, mdl, mdl2, crt].forEach(function(el) { if (el) el.disabled = !isAdmin; });
     }
     if (cb) cb();
   }).catch(function() { if (cb) cb(); });
@@ -1005,23 +1012,36 @@ function switchTab(tab) {
 
 function onEngineChange() {
   var engine = document.getElementById('selEngine').value;
-  var sel = document.getElementById('selModel');
-  sel.innerHTML = (APP.models[engine] || []).map(m => `<option value="${m}">${m}</option>`).join('');
+  var list = APP.models[engine] || [];
+  var opts = list.map(function(m){
+    var reco = (typeof MODEL_RECO !== 'undefined' && MODEL_RECO[m]) ? ' — ' + MODEL_RECO[m] : '';
+    return '<option value="' + m + '">' + m + reco + '</option>';
+  }).join('');
+  var sel  = document.getElementById('selModel');
+  var sel2 = document.getElementById('selModel2');
+  if (sel)  sel.innerHTML  = opts;
+  if (sel2) sel2.innerHTML = opts;
 
   // Google은 모델/Creativity 불필요 → 숨김
   var isGoogle = engine === 'google';
-  var modelCtrl = document.getElementById('selModel').closest('.ctrl-g');
-  var creatCtrl = document.getElementById('slCreat')?.closest('.ctrl-g');
-  if (modelCtrl) modelCtrl.style.display = isGoogle ? 'none' : '';
-  if (creatCtrl) creatCtrl.style.display = isGoogle ? 'none' : '';
+  var modelCtrl  = document.getElementById('selModel').closest('.ctrl-g');
+  var model2Ctrl = document.getElementById('selModel2') ? document.getElementById('selModel2').closest('.ctrl-g') : null;
+  var creatCtrl  = document.getElementById('slCreat')?.closest('.ctrl-g');
+  if (modelCtrl)  modelCtrl.style.display  = isGoogle ? 'none' : '';
+  if (model2Ctrl) model2Ctrl.style.display = isGoogle ? 'none' : '';
+  if (creatCtrl)  creatCtrl.style.display  = isGoogle ? 'none' : '';
 }
 
 // 관리자가 상단바에서 엔진/모델/creativity 변경 시 설정 자동 저장
 async function saveEngineSettingFromToolbar() {
   if (APP.teacher.role !== '관리자') return;
+  var step1 = document.getElementById('selModel').value;
+  var step2 = document.getElementById('selModel2') ? document.getElementById('selModel2').value : step1;
   var data = {
     engine:     document.getElementById('selEngine').value,
-    model:      document.getElementById('selModel').value,
+    model:      step1,        // 공통 model = 번역(①) 모델 기준
+    step1Model: step1,
+    step2Model: step2,
     creativity: document.getElementById('slCreat').value
   };
   try {
@@ -1030,6 +1050,8 @@ async function saveEngineSettingFromToolbar() {
       if (APP.settings) {
         APP.settings.engine = data.engine;
         APP.settings.model = data.model;
+        APP.settings.step1Model = step1;
+        APP.settings.step2Model = step2;
         APP.settings.creativity = data.creativity;
       }
       toast('엔진 설정 저장됨 ✓', 'success');
@@ -2135,14 +2157,14 @@ async function persistCustomModels() {
 // 상단바(번역 탭) 모델 드롭다운 갱신
 function refreshToolbarModels() {
   var topEngine = document.getElementById('selEngine');
-  var topModel  = document.getElementById('selModel');
-  if (!topEngine || !topModel) return;
-  var cur = topModel.value;
-  // 상단바 엔진의 현재 모델 목록 다시 채움
-  topModel.innerHTML = (APP.models[topEngine.value] || []).map(function(m) {
-    return '<option value="' + m + '">' + m + '</option>';
-  }).join('');
-  if (cur && APP.models[topEngine.value].indexOf(cur) !== -1) topModel.value = cur;
+  if (!topEngine) return;
+  var cur1 = document.getElementById('selModel') ? document.getElementById('selModel').value : '';
+  var cur2 = document.getElementById('selModel2') ? document.getElementById('selModel2').value : '';
+  onEngineChange(); // 두 드롭다운 모두 다시 채움
+  var list = APP.models[topEngine.value] || [];
+  if (cur1 && list.indexOf(cur1) !== -1) document.getElementById('selModel').value = cur1;
+  if (cur2 && list.indexOf(cur2) !== -1 && document.getElementById('selModel2'))
+    document.getElementById('selModel2').value = cur2;
 }
 
 async function saveSettingsModal() {

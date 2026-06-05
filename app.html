@@ -65,8 +65,10 @@
         <option value="gemini">Gemini (무료)</option>
         <option value="google">Google 번역 (무료)</option>
       </select></div>
-    <div class="ctrl-g engine-ctrl"><span class="clabel">Model</span>
+    <div class="ctrl-g engine-ctrl"><span class="clabel">Model ①번역</span>
       <select id="selModel" onchange="saveEngineSettingFromToolbar()"></select></div>
+    <div class="ctrl-g engine-ctrl"><span class="clabel">Model ②세특</span>
+      <select id="selModel2" onchange="saveEngineSettingFromToolbar()"></select></div>
     <div class="ctrl-g creat-wrap engine-ctrl">
       <span class="clabel">Creativity</span>
       <input type="range" id="slCreat" min="0.1" max="0.9" step="0.1" value="0.5"
