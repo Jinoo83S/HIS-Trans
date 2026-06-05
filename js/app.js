@@ -127,7 +127,7 @@ function initUI() {
 
   // 설정 로드 후 초기 데이터
   loadSettings(function() {
-    onEngineChange();
+    // onEngineChange는 loadSettings 내부에서 이미 호출됨 (여기서 다시 부르면 step1/step2 모델이 리셋됨)
     applyDefaultView(defaultView);
     loadInitialData();
     setTimeout(relayout, 100);
