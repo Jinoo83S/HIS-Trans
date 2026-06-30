@@ -69,12 +69,6 @@
       <select id="selModel" onchange="saveEngineSettingFromToolbar()"></select></div>
     <div class="ctrl-g engine-ctrl"><span class="clabel">Model ②세특</span>
       <select id="selModel2" onchange="saveEngineSettingFromToolbar()"></select></div>
-    <div class="ctrl-g creat-wrap engine-ctrl">
-      <span class="clabel">Creativity</span>
-      <input type="range" id="slCreat" min="0.1" max="0.9" step="0.1" value="0.5"
-        oninput="document.getElementById('vCreat').textContent=this.value"
-        onchange="saveEngineSettingFromToolbar()">
-      <span class="creat-val" id="vCreat">0.5</span></div>
     <button class="btn-icon trans-only" onclick="openPromptModal()">✏️ 프롬프트</button>
     <button class="btn-teal trans-only" onclick="pipelineAll()">▶ 전체 번역</button>
     <button class="btn-icon trans-only" onclick="loadInitialData(true)" title="데이터 새로고침" style="flex-shrink:0">🔄</button>
@@ -157,8 +151,6 @@
           width:18px;height:18px;font-size:12px;cursor:pointer;line-height:1;padding:0">−</button>
         </div>
         <select class="finput" id="setModel"></select></div>
-      <div style="flex:0 0 100px"><div class="flabel">Creativity</div>
-        <input class="finput" id="setCreat" type="number" step="0.1" min="0" max="1" value="0.3"></div>
     </div>
     <div class="frow" style="background:var(--bg3);padding:10px;border-radius:8px">
       <div class="flabel">🔧 단계별 모델 분리 (선택) — 비우면 위 공통 모델 사용</div>
@@ -313,14 +305,6 @@
   </div>
 </div>
 
-<!-- 저장 진행 오버레이 -->
-<div class="overlay" id="saveOverlay">
-  <div class="modal" style="max-width:280px;text-align:center">
-    <div class="spinner" style="margin:0 auto 14px"></div>
-    <div id="saveText" style="font-size:14px;font-weight:600;color:var(--text)">저장 중...</div>
-  </div>
-</div>
-
 <!-- 토스트 -->
 <div id="toast"></div>
 
@@ -394,7 +378,7 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx-js-style/1.2.0/xlsx.bundle.js"></script>
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/api.js"></script>
