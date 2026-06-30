@@ -227,8 +227,9 @@
     <button class="modal-x" onclick="closeModal('neisRulesOverlay')">×</button>
     <h3>✅ NEIS 검토 규칙</h3>
     <div class="frow">
-      <label class="flabel">최대 글자수</label>
-      <input class="finput" id="nr_maxChars" type="number" min="1" value="500">
+      <label class="flabel">최대 Byte</label>
+      <input class="finput" id="nr_maxChars" type="number" min="1" value="1500">
+      <div style="font-size:11px;color:var(--gray);margin-top:4px">한글/비ASCII 3byte, 영문·숫자·공백·줄바꿈 1byte 기준</div>
     </div>
     <div class="frow">
       <label class="flabel">금칙 특수문자 (붙여서 입력)</label>

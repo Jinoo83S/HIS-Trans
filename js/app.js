@@ -39,16 +39,28 @@ function isTranslateReadOnlyView() {
   return APP.teacher && APP.teacher.role === '번역' && APP.currentView === 'translate';
 }
 
-// NEIS 글자수(바이트) 계산: 한글/전각=2, 영문·숫자·공백 등=1, 줄바꿈 제외
-// 시트 서식 =2*LENB(A)-LEN(SUBSTITUTE(A,CHAR(10),"")) 와 동일 기준
+var DEFAULT_NEIS_MAX_BYTES = 1500;
+
+// NEIS byte 계산: 한글/비ASCII=3byte, 영문·숫자·공백·줄바꿈=1byte
+// Excel(한국어 DBCS 환경) 기준: =(LENB(A1)-LEN(A1))*2+LEN(A1) 와 동일한 계산 방향
 function neisByteLength(str) {
   if (!str) return 0;
-  var s = String(str).replace(/\n/g, ''); // 줄바꿈 제외
   var len = 0;
-  for (var i = 0; i < s.length; i++) {
-    len += (s.charCodeAt(i) > 127) ? 2 : 1; // 비ASCII(한글 등)=2
-  }
+  Array.from(String(str)).forEach(function(ch) {
+    len += (ch.charCodeAt(0) > 127) ? 3 : 1;
+  });
   return len;
+}
+
+function getNeisMaxBytes() {
+  var r = (APP.settings && APP.settings.neisRules) || {};
+  var v = r.maxBytes != null ? r.maxBytes : r.maxChars;
+  v = parseInt(v, 10);
+  return Number.isFinite(v) && v > 0 ? v : DEFAULT_NEIS_MAX_BYTES;
+}
+
+function getNeisWarnBytes() {
+  return Math.floor(getNeisMaxBytes() * 0.9);
 }
 
 // ── 초기화 ──────────────────────────────────────────────────
@@ -821,7 +833,7 @@ function renderTable() {
       'style="background:var(--teal);color:#fff;border:none;border-radius:50%;' +
       'width:16px;height:16px;font-size:10px;cursor:pointer;font-weight:700;' +
       'line-height:16px;padding:0;vertical-align:middle">?</button></th>' +
-    '<th>글자수</th><th>상태</th>' +
+    '<th>Byte</th><th>상태</th>' +
     '</tr>';
 
   body.innerHTML = APP.rows.map((r, i) => rowHtml(r, i, role)).join('');
@@ -941,7 +953,9 @@ function rowHtml(r, i, role) {
   var s = r.student;
   var txt = r.finalText || r.translatedDraft || '';
   var cc = neisByteLength(txt);
-  var ccCls = cc === 0 ? '' : cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
+  var maxBytes = getNeisMaxBytes();
+  var warnBytes = getNeisWarnBytes();
+  var ccCls = cc === 0 ? '' : cc > maxBytes ? 'cc-over' : cc > warnBytes ? 'cc-warn' : 'cc-ok';
   // AI 세특 원본 대비 수정 부분 하이라이트 (최종본 있으면 항상 표시)
   // aiFinal 없으면(저장 후 재로드 등) 전체를 파란색으로
   var diffBase = r.aiFinal || r.finalText;
@@ -999,7 +1013,7 @@ function rowHtml(r, i, role) {
     <td><div class="cc ${ccCls}">
       ${cc>0 ? '<span style="font-size:9px;color:var(--gray);display:block">' +
         (document.getElementById('selSem')?.value==='1'?'1학기':'2학기') +
-        '</span>' + cc + '/500' : '-'}
+        '</span>' + cc + '/' + maxBytes + 'byte' : '-'}
     </div></td>
     <td class="col-status"><div class="ci" style="padding:4px 2px">
       ${statusHtml}
@@ -1062,11 +1076,13 @@ function updateCC(i) {
   var cc = neisByteLength(txt);
   var el = document.querySelector('#row_' + i + ' .cc');
   if (!el) return;
-  var cls = cc === 0 ? '' : cc > 500 ? 'cc-over' : cc > 450 ? 'cc-warn' : 'cc-ok';
+  var maxBytes = getNeisMaxBytes();
+  var warnBytes = getNeisWarnBytes();
+  var cls = cc === 0 ? '' : cc > maxBytes ? 'cc-over' : cc > warnBytes ? 'cc-warn' : 'cc-ok';
   var sem = document.getElementById('selSem').value;
   var semLabel = sem === '1' ? '1학기' : '2학기';
   el.innerHTML = cc > 0
-    ? '<span style="font-size:9px;color:var(--gray);display:block">' + semLabel + '</span>' + cc + '/500'
+    ? '<span style="font-size:9px;color:var(--gray);display:block">' + semLabel + '</span>' + cc + '/' + maxBytes + 'byte'
     : '-';
   el.className = 'cc ' + cls;
 }
@@ -1507,7 +1523,8 @@ async function checkNeis(i) {
     var res = await API.neisValidate(txt);
     if (!res.success) return;
     var d = res.data;
-    alert('[NEIS 검토 결과]\n글자수: ' + d.charCount + '/500\n\n' +
+    var maxBytes = d.maxBytes || getNeisMaxBytes();
+    alert('[NEIS 검토 결과]\nByte: ' + d.charCount + '/' + maxBytes + 'byte\n\n' +
       (d.warnings.length ? d.warnings.join('\n') : '✓ 이상 없음'));
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -1756,7 +1773,7 @@ async function openNeisRulesModal() {
     if (res && res.success) APP.settings = res.data;
   } catch(e) {}
   var r = (APP.settings && APP.settings.neisRules) || {};
-  document.getElementById('nr_maxChars').value     = r.maxChars != null ? r.maxChars : 500;
+  document.getElementById('nr_maxChars').value     = r.maxBytes != null ? r.maxBytes : (r.maxChars != null ? r.maxChars : DEFAULT_NEIS_MAX_BYTES);
   document.getElementById('nr_forbidden').value    = r.forbidden != null ? r.forbidden : '<>{}[]\\|^~`';
   document.getElementById('nr_endings').value      = r.endings != null ? r.endings : '함.,임.,됨.,있음.,없음.,보임.,나타남.,이룸.';
   document.getElementById('nr_dupThreshold').value = r.dupThreshold != null ? r.dupThreshold : 3;
@@ -1768,7 +1785,8 @@ async function openNeisRulesModal() {
 
 async function saveNeisRules() {
   var rules = {
-    maxChars:     parseInt(document.getElementById('nr_maxChars').value) || 500,
+    maxBytes:     parseInt(document.getElementById('nr_maxChars').value, 10) || DEFAULT_NEIS_MAX_BYTES,
+    maxChars:     parseInt(document.getElementById('nr_maxChars').value, 10) || DEFAULT_NEIS_MAX_BYTES, // 기존 GAS/시트 호환용
     forbidden:    document.getElementById('nr_forbidden').value,
     endings:      document.getElementById('nr_endings').value,
     dupThreshold: parseInt(document.getElementById('nr_dupThreshold').value) || 3,
@@ -2363,7 +2381,7 @@ async function showNeisHelp() {
     if (res && res.success) { APP.settings = res.data; r = res.data.neisRules || {}; }
   } catch(e) {}
 
-  var maxChars = r.maxChars != null ? r.maxChars : 500;
+  var maxBytes = r.maxBytes != null ? r.maxBytes : (r.maxChars != null ? r.maxChars : DEFAULT_NEIS_MAX_BYTES);
   var forbidden = r.forbidden != null ? r.forbidden : '<>{}[]\\|^~`';
   var endings = (r.endings || '함.,임.,됨.,있음.').split(',').map(function(x){return x.trim();}).filter(Boolean);
   var dupTh = r.dupThreshold != null ? r.dupThreshold : 3;
@@ -2371,7 +2389,7 @@ async function showNeisHelp() {
 
   var rows = '';
   rows += '<div style="padding:8px 12px;background:var(--bg3);border-radius:6px;margin-bottom:8px">' +
-    '<b>📏 글자수</b> — ' + maxChars + '자 초과 여부 확인</div>';
+    '<b>📏 Byte</b> — ' + maxBytes + 'byte 초과 여부 확인</div>';
 
   var forbiddenDisp = Array.from(forbidden).filter(function(c){return c.trim();}).join(' ');
   rows += '<div style="padding:8px 12px;background:var(--bg3);border-radius:6px;margin-bottom:8px">' +
