@@ -167,7 +167,7 @@ function toggleToolbarMode(isAdminView) {
   });
   // 관리자는 관리 탭에서 엔진 컨트롤 편집 가능, 그 외엔 읽기전용
   var canEdit = APP.teacher.role === '관리자';
-  ['selEngine','selModel','slCreat'].forEach(function(id) {
+  ['selEngine','selModel'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.disabled = !canEdit;
   });
@@ -179,11 +179,10 @@ function loadSettings(cb) {
     if (res && res.success) {
       APP.settings = res.data;
       mergeCustomModels(res.data.customModels);
-      // 엔진/모델/creativity 기본값 적용
+      // 엔진/모델 기본값 적용
       var eng = document.getElementById('selEngine');
       var mdl = document.getElementById('selModel');
       var mdl2 = document.getElementById('selModel2');
-      var crt = document.getElementById('slCreat');
       var savedEngine = res.data.engine || 'claude';
       var savedModel  = res.data.model  || 'claude-opus-4-8';
       // 단계별 모델: 설정값 없으면 공통 모델로 폴백
@@ -205,11 +204,9 @@ function loadSettings(cb) {
       if (mdl)  mdl.value  = savedStep1;  // ①번역 모델
       if (mdl2) mdl2.value = savedStep2;  // ②세특 모델
 
-      if (crt) { crt.value = res.data.creativity || '0.3';
-        var vc = document.getElementById('vCreat'); if (vc) vc.textContent = crt.value; }
       // 엔진 설정: 관리자 외 비활성화 (읽기전용 표시)
       var isAdmin = APP.teacher.role === '관리자';
-      [eng, mdl, mdl2, crt].forEach(function(el) { if (el) el.disabled = !isAdmin; });
+      [eng, mdl, mdl2].forEach(function(el) { if (el) el.disabled = !isAdmin; });
     }
     if (cb) cb();
   }).catch(function() { if (cb) cb(); });
@@ -1048,17 +1045,15 @@ function onEngineChange() {
   if (sel)  sel.innerHTML  = opts;
   if (sel2) sel2.innerHTML = opts;
 
-  // Google은 모델/Creativity 불필요 → 숨김
+  // Google은 모델 불필요 → 숨김
   var isGoogle = engine === 'google';
   var modelCtrl  = document.getElementById('selModel').closest('.ctrl-g');
   var model2Ctrl = document.getElementById('selModel2') ? document.getElementById('selModel2').closest('.ctrl-g') : null;
-  var creatCtrl  = document.getElementById('slCreat')?.closest('.ctrl-g');
   if (modelCtrl)  modelCtrl.style.display  = isGoogle ? 'none' : '';
   if (model2Ctrl) model2Ctrl.style.display = isGoogle ? 'none' : '';
-  if (creatCtrl)  creatCtrl.style.display  = isGoogle ? 'none' : '';
 }
 
-// 관리자가 상단바에서 엔진/모델/creativity 변경 시 설정 자동 저장
+// 관리자가 상단바에서 엔진/모델 변경 시 설정 자동 저장
 async function saveEngineSettingFromToolbar() {
   if (APP.teacher.role !== '관리자') return;
   var step1 = document.getElementById('selModel').value;
@@ -1067,8 +1062,7 @@ async function saveEngineSettingFromToolbar() {
     engine:     document.getElementById('selEngine').value,
     model:      step1,        // 공통 model = 번역(①) 모델 기준
     step1Model: step1,
-    step2Model: step2,
-    creativity: document.getElementById('slCreat').value
+    step2Model: step2
   };
   try {
     var res = await API.saveSettings(data);
@@ -1078,7 +1072,6 @@ async function saveEngineSettingFromToolbar() {
         APP.settings.model = data.model;
         APP.settings.step1Model = step1;
         APP.settings.step2Model = step2;
-        APP.settings.creativity = data.creativity;
       }
       toast('엔진 설정 저장됨 ✓', 'success');
     }
@@ -1129,7 +1122,6 @@ function getPayload(row) {
   return {
     engine:     document.getElementById('selEngine').value,
     model:      document.getElementById('selModel').value,
-    creativity: parseFloat(document.getElementById('slCreat').value),
     prompt:     APP.prompt,
     sourceLang: document.getElementById('selSrc').value,
     targetLang: document.getElementById('selTgt').value,
@@ -1217,7 +1209,6 @@ async function saveRow(i, opts) {
       sourceLang:   document.getElementById('selSrc').value,
       targetLang:   document.getElementById('selTgt').value,
       model:        document.getElementById('selModel').value,
-      creativity:   document.getElementById('slCreat').value,
       prompt:       APP.prompt,
       sourceText:      row.sourceText,
       translatedDraft: row.translatedDraft,
@@ -2003,7 +1994,6 @@ async function openSettingsModal() {
   document.getElementById('setEngine').value = s.engine || 'claude';
   onSetEngineChange();
   document.getElementById('setModel').value  = s.model || 'claude-opus-4-8';
-  document.getElementById('setCreat').value  = s.creativity || '0.3';
   document.getElementById('setStep1').value  = s.step1_prompt || '';
   document.getElementById('setStep2').value  = s.step2_prompt || '';
   // 단계별 모델 드롭다운 채우기
@@ -2152,7 +2142,6 @@ async function saveSettingsModal() {
   var data = {
     engine:       document.getElementById('setEngine').value,
     model:        document.getElementById('setModel').value,
-    creativity:   document.getElementById('setCreat').value,
     step1_prompt: document.getElementById('setStep1').value,
     step2_prompt: document.getElementById('setStep2').value,
     step1Model:   document.getElementById('setStep1Model').value,
