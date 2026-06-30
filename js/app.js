@@ -30,6 +30,15 @@ var APP = {
 // 원문 길이 경고 임계값 (영어 세특은 보통 2000자 이내)
 var SOURCE_WARN_LEN = 3000;
 
+// 번역 권한(입력자) 교사는 Translate 탭을 조회 전용으로만 사용
+function canViewTranslateTab() {
+  var role = APP.teacher && APP.teacher.role;
+  return role === '번역' || role === '검수' || role === '관리자';
+}
+function isTranslateReadOnlyView() {
+  return APP.teacher && APP.teacher.role === '번역' && APP.currentView === 'translate';
+}
+
 // NEIS 글자수(바이트) 계산: 한글/전각=2, 영문·숫자·공백 등=1, 줄바꿈 제외
 // 시트 서식 =2*LENB(A)-LEN(SUBSTITUTE(A,CHAR(10),"")) 와 동일 기준
 function neisByteLength(str) {
@@ -113,7 +122,7 @@ function initUI() {
   // 권한별 탭 표시
   var role = t.role;
   var canInput     = (role === '번역' || role === '관리자');
-  var canTranslate = (role === '검수' || role === '관리자');
+  var canTranslate = canViewTranslateTab();
   if (canInput)     document.getElementById('navInput').style.display = '';
   if (canTranslate) document.getElementById('navTranslate').style.display = '';
   if (role === '관리자') document.getElementById('navAdmin').style.display = '';
@@ -162,16 +171,43 @@ function applyDefaultView(view) {
 
 // 관리 탭: 번역 전용 컨트롤 숨김, 엔진 컨트롤만 표시
 function toggleToolbarMode(isAdminView) {
+  var readOnlyTrans = isTranslateReadOnlyView();
+
   document.querySelectorAll('.trans-only').forEach(function(el) {
     el.style.display = isAdminView ? 'none' : '';
   });
-  // 관리자는 관리 탭에서 엔진 컨트롤 편집 가능, 그 외엔 읽기전용
+
+  // 번역 입력자에게 Translate 탭은 조회 전용: 생성/저장/내보내기 관련 버튼 숨김
+  var actionSelectors = [
+    'button[onclick="openPromptModal()"]',
+    'button[onclick="pipelineAll()"]',
+    '#btnSaveAll',
+    'button[onclick="downloadExcel()"]'
+  ];
+  actionSelectors.forEach(function(q) {
+    var el = document.querySelector(q);
+    if (el) el.style.display = readOnlyTrans ? 'none' : '';
+  });
+
+  // 조회 전용 Translate 탭에서는 엔진/모델 선택도 숨김
+  document.querySelectorAll('.engine-ctrl').forEach(function(el) {
+    el.style.display = readOnlyTrans ? 'none' : '';
+  });
+
+  // 관리자는 엔진 컨트롤 편집 가능, 그 외엔 읽기전용
   var canEdit = APP.teacher.role === '관리자';
-  ['selEngine','selModel'].forEach(function(id) {
+  ['selEngine','selModel','selModel2'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.disabled = !canEdit;
   });
+
+  // 조회 전용 Translate 탭에서는 언어 선택도 변경하지 못하게 함
+  ['selSrc','selTgt'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.disabled = readOnlyTrans;
+  });
 }
+
 
 // 설정 로드 (엔진/프롬프트/용어/예시)
 function loadSettings(cb) {
@@ -553,6 +589,7 @@ function onInputSourceChange(i, val) {
 
 // ── 2단계 파이프라인 (단일 행) ────────────────────────────────
 async function pipelineRow(i) {
+  if (isTranslateReadOnlyView()) { toast('Translate 탭은 조회 전용입니다.', 'error'); return; }
   var row = APP.rows[i];
   if (!row.sourceText || !row.sourceText.trim()) { toast('원문이 없습니다.', 'error'); return; }
 
@@ -602,6 +639,7 @@ async function pipelineRow(i) {
 
 // ── 2단계 파이프라인 (전체) ───────────────────────────────────
 async function pipelineAll() {
+  if (isTranslateReadOnlyView()) { toast('Translate 탭은 조회 전용입니다.', 'error'); return; }
   var targets = APP.rows.filter(function(r) { return r.sourceText && r.sourceText.trim() && !r.finalText; });
   if (!targets.length) { toast('번역할 항목이 없습니다.', 'error'); return; }
 
@@ -908,6 +946,25 @@ function rowHtml(r, i, role) {
   // aiFinal 없으면(저장 후 재로드 등) 전체를 파란색으로
   var diffBase = r.aiFinal || r.finalText;
   var finalDiff = r.finalText ? buildFinalDiffHtml(diffBase, r.finalText) : '';
+  var readOnly = isTranslateReadOnlyView();
+  var finalAttrs = readOnly
+    ? 'readonly style="color:var(--text2)"'
+    : `oninput="onFinalChange(${i},this.value);autoResize(this)"`;
+  var reviewCell = readOnly
+    ? '<span class="sbadge s-draft" style="white-space:nowrap">조회전용</span>'
+    : `<button class="btn-arrow" onclick="runNeisCheck(${i})" title="NEIS 검토"
+        style="font-size:14px;background:none;border:none;cursor:pointer;
+        color:var(--primary);padding:4px;transition:transform 0.15s"
+        onmouseover="this.style.transform=\'scale(1.3)\'"
+        onmouseout="this.style.transform=\'scale(1)\'">🔍</button>`;
+  var statusHtml = buildStatusBadge(r, i);
+  if (!readOnly) {
+    statusHtml += `<button class="btn-cp" onclick="saveRow(${i})"
+        style="margin-top:5px;width:100%;
+        ${r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : ''}">
+        저장
+      </button>`;
+  }
 
   return `<tr id="row_${i}">
     <td class="col-info"><div class="ci" style="font-size:11px">${e(s.engName||'-')}</div></td>
@@ -927,7 +984,7 @@ function rowHtml(r, i, role) {
         color:#854d0e;white-space:pre-wrap">📌 ${e(r.aiMemo)}</div>
     </td>
     <td class="col-final">
-      <textarea class="cta fnl" id="fnl_${i}" oninput="onFinalChange(${i},this.value);autoResize(this)">${e(r.finalText)}</textarea>
+      <textarea class="cta fnl" id="fnl_${i}" ${finalAttrs}>${e(r.finalText)}</textarea>
       <div class="final-diff" id="fdiff_${i}"
         style="${finalDiff?'':'display:none'};padding:6px 6px;font-size:11px;line-height:1.6;
         word-break:break-word;background:#fffdf5;border-top:1px dashed #fbbf24">
@@ -935,13 +992,7 @@ function rowHtml(r, i, role) {
         ${finalDiff}
       </div>
     </td>
-    <td class="ca">
-      <button class="btn-arrow" onclick="runNeisCheck(${i})" title="NEIS 검토"
-        style="font-size:14px;background:none;border:none;cursor:pointer;
-        color:var(--primary);padding:4px;transition:transform 0.15s"
-        onmouseover="this.style.transform='scale(1.3)'"
-        onmouseout="this.style.transform='scale(1)'">🔍</button>
-    </td>
+    <td class="ca">${reviewCell}</td>
     <td class="col-cmt"><div class="cta cmt" id="neis_cmt_${i}"
       style="min-height:76px;padding:7px 9px;font-size:11px;
       color:var(--text2);white-space:pre-wrap">${e(r.comment)}</div></td>
@@ -951,12 +1002,7 @@ function rowHtml(r, i, role) {
         '</span>' + cc + '/500' : '-'}
     </div></td>
     <td class="col-status"><div class="ci" style="padding:4px 2px">
-      ${buildStatusBadge(r, i)}
-      <button class="btn-cp" onclick="saveRow(${i})"
-        style="margin-top:5px;width:100%;
-        ${r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : ''}">
-        저장
-      </button>
+      ${statusHtml}
     </div></td>
   </tr>`;
 }
@@ -1080,6 +1126,7 @@ async function saveEngineSettingFromToolbar() {
 
 function setView(btn) {
   var view = btn.dataset.view;
+  if (view === 'translate' && !canViewTranslateTab()) { toast('번역 탭 접근 권한이 없습니다.', 'error'); return; }
   APP.currentView = view;
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -1177,6 +1224,7 @@ async function translateAll() {
 // ── 저장 ────────────────────────────────────────────────────
 async function saveRow(i, opts) {
   opts = opts || {};
+  if (isTranslateReadOnlyView()) { if (!opts.silent) toast('Translate 탭은 조회 전용입니다.', 'error'); return false; }
   var row = APP.rows[i];
   var s = APP.selectedSubject;
   if (!s) { if (!opts.silent) toast('과목을 선택하세요.', 'error'); return false; }
@@ -1291,6 +1339,7 @@ async function saveAll() {
 
 // ── NEIS 엑셀 다운로드 ──────────────────────────────────────────
 function downloadExcel() {
+  if (isTranslateReadOnlyView()) { toast('Translate 탭은 조회 전용입니다.', 'error'); return; }
   if (!APP.rows || !APP.rows.length) { toast('다운로드할 데이터가 없습니다.', 'error'); return; }
   if (!APP.selectedSubject) { toast('과목을 선택하세요.', 'error'); return; }
   if (typeof XLSX === 'undefined') { toast('엑셀 라이브러리 로드 실패. 새로고침 후 다시 시도하세요.', 'error'); return; }
@@ -1428,6 +1477,7 @@ function buildFinalDiffHtml(aiDraft, finalText) {
 }
 
 async function runNeisCheck(i) {
+  if (isTranslateReadOnlyView()) { toast('Translate 탭은 조회 전용입니다.', 'error'); return; }
   var txt = APP.rows[i].finalText || APP.rows[i].translatedDraft;
   if (!txt) { toast('검토할 텍스트가 없습니다.', 'error'); return; }
   var cmtEl = document.getElementById('neis_cmt_' + i);
@@ -2286,9 +2336,11 @@ function buildStatusBadge(r, idx) {
               : 's-draft';
     var style = r.status === 'ai_draft' ? ' style="background:#fef3c7;color:#92400e"' : '';
     var badge = '<span class="sbadge ' + cls + '"' + style + '>' + label + '</span>';
-    // AI초안이면 "검수확정" 안내
+    // AI초안 안내: 입력자 Translate 탭은 조회 전용이므로 검수 대기 표시
     if (r.status === 'ai_draft') {
-      badge += '<div style="font-size:9px;color:var(--gray);margin-top:2px">저장=검수확정</div>';
+      badge += isTranslateReadOnlyView()
+        ? '<div style="font-size:9px;color:var(--gray);margin-top:2px">검수 대기</div>'
+        : '<div style="font-size:9px;color:var(--gray);margin-top:2px">저장=검수확정</div>';
     }
     // 검수완료/최종완료면 복사 버튼 노출
     if ((r.status === 'reviewed' || r.status === 'final') && idx !== undefined) {
