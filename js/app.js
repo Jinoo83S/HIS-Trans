@@ -588,8 +588,24 @@ function buildInputStatus(r) {
   return '<span class="sbadge s-reviewed">Saved</span>' + warn;
 }
 
+// 입력자가 Source를 비우면 기존 번역/변환 결과도 즉시 비움.
+// 저장 시 GAS에도 빈 Source + 빈 번역값으로 기록되어, 최신 기록 기준으로 Translate 탭에서 보이지 않게 된다.
+function clearTranslatedDataIfSourceEmpty(row) {
+  if (!row) return false;
+  if (row.sourceText && String(row.sourceText).trim()) return false;
+  row.sourceText      = row.sourceText || '';
+  row.translatedDraft = '';
+  row.finalText       = '';
+  row.comment         = '';
+  row.aiMemo          = '';
+  row.aiFinal         = '';
+  row.status          = 'draft';
+  return true;
+}
+
 function onInputSourceChange(i, val) {
   APP.rows[i].sourceText = val;
+  clearTranslatedDataIfSourceEmpty(APP.rows[i]);
   APP.rows[i]._dirty = true;
   var cell = document.querySelector('#irow_' + i + ' td:last-child');
   if (cell) cell.innerHTML =
@@ -1245,6 +1261,10 @@ async function saveRow(i, opts) {
   var s = APP.selectedSubject;
   if (!s) { if (!opts.silent) toast('과목을 선택하세요.', 'error'); return false; }
 
+  // 입력 탭에서 Source를 삭제한 경우 기존 번역/변환값을 함께 삭제 처리한다.
+  // append-only 저장 구조이므로, 최신 행에 빈 Source/번역값을 저장하여 과거 번역값이 다시 노출되지 않게 한다.
+  clearTranslatedDataIfSourceEmpty(row);
+
   if (!opts.silent) showSaving('저장 중...');
   try {
     var res;
@@ -1329,7 +1349,8 @@ async function saveAll() {
   if (!s) { toast('과목을 선택하세요.', 'error'); return; }
 
   // 내용이 있고 미저장인 행만 대상
-  var targets = APP.rows.filter(r => (r.sourceText || r.translatedDraft) && (!r.rowIndex || r._dirty));
+  // Source 삭제 행은 sourceText/translatedDraft가 비어 있어도 _dirty=true이면 저장 대상에 포함해야 한다.
+  var targets = APP.rows.filter(r => (r.sourceText || r.translatedDraft || r.finalText || r._dirty) && (!r.rowIndex || r._dirty));
   if (!targets.length) {
     toast('저장할 항목이 없습니다. (이미 모두 저장됨)', 'success'); return;
   }
