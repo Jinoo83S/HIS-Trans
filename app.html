@@ -51,7 +51,7 @@
       </select></div>
     <div class="ctrl-g trans-only">
       <select id="selSubject" class="sel-subject" onchange="onSubjectChange()">
-        <option value="">-- 과목/동아리 선택 --</option>
+        <option value="">-- 과목/동아리 선택 / Select Course or Club --</option>
       </select></div>
     <div class="hsep trans-only"></div>
     <div class="ctrl-g trans-only"><span class="clabel">Source</span>
@@ -69,11 +69,11 @@
       <select id="selModel" onchange="saveEngineSettingFromToolbar()"></select></div>
     <div class="ctrl-g engine-ctrl"><span class="clabel">Model ②세특</span>
       <select id="selModel2" onchange="saveEngineSettingFromToolbar()"></select></div>
-    <button class="btn-icon trans-only" onclick="openPromptModal()">✏️ 프롬프트</button>
-    <button class="btn-teal trans-only" onclick="pipelineAll()">▶ 전체 번역</button>
+    <button class="btn-icon trans-only" onclick="openPromptModal()">✏️ Prompt</button>
+    <button class="btn-teal trans-only" onclick="pipelineAll()">▶ Translate All</button>
     <button class="btn-icon trans-only" onclick="loadInitialData(true)" title="데이터 새로고침" style="flex-shrink:0">🔄</button>
-    <button class="btn-icon trans-only" onclick="saveAll()" style="border-color:#16a34a;color:#16a34a" id="btnSaveAll">💾 일괄 저장</button>
-    <button class="btn-icon trans-only" onclick="downloadExcel()" style="border-color:#0369a1;color:#0369a1;flex-shrink:0" title="NEIS 엑셀 다운로드">📥 엑셀</button>
+    <button class="btn-icon trans-only" onclick="saveAll()" style="border-color:#16a34a;color:#16a34a" id="btnSaveAll">💾 Save All</button>
+    <button class="btn-icon trans-only" onclick="downloadExcel()" style="border-color:#0369a1;color:#0369a1;flex-shrink:0" title="NEIS Excel Export">📥 Export to Excel</button>
   </div>
 </div>
 

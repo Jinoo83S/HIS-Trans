@@ -343,23 +343,25 @@ function renderSubjectSelect() {
     });
 
     sel.innerHTML = '<option value="">-- ' +
-      (tab === '과목' ? '과목 선택' : '동아리 선택') + ' --</option>' +
+      (tab === '과목' ? '과목 선택 / Select Course' : '동아리 선택 / Select Club') + ' --</option>' +
       groupOrder.map(function(teacher) {
         var opts = groups[teacher].map(function(s) {
           var allTeachers = s.teachers && s.teachers.length > 1
             ? ' [' + s.teachers.join(', ') + ']' : '';
           var gradePrefix = tab === '과목' ? 'G' + s.grade + ' | ' : '';
+          var nameLabel = s.nameEN ? (s.nameKR + ' / ' + s.nameEN) : s.nameKR;
           return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
-            `${pendingPrefix(s.subjectCode, tab==='동아리')}${gradePrefix}${s.nameKR}${allTeachers}</option>`;
+            `${pendingPrefix(s.subjectCode, tab==='동아리')}${gradePrefix}${nameLabel}${allTeachers}</option>`;
         }).join('');
         return `<optgroup label="👤 ${teacher}">${opts}</optgroup>`;
       }).join('');
   } else {
     sel.innerHTML = '<option value="">-- ' +
-      (tab === '과목' ? '과목 선택' : '동아리 선택') + ' --</option>' +
+      (tab === '과목' ? '과목 선택 / Select Course' : '동아리 선택 / Select Club') + ' --</option>' +
       filtered.map(function(s) {
+        var nameLabel = s.nameEN ? (s.nameKR + ' / ' + s.nameEN) : s.nameKR;
         return `<option value="${s.subjectCode}" data-s='${JSON.stringify(s)}'>` +
-          `${pendingPrefix(s.subjectCode, tab==='동아리')}${s.nameKR} / ${s.nameEN}</option>`;
+          `${pendingPrefix(s.subjectCode, tab==='동아리')}${nameLabel}</option>`;
       }).join('');
   }
 }
@@ -760,7 +762,7 @@ async function saveAllAiDraft() {
   var targets = APP.rows.filter(r => r.status === 'ai_draft' && r._dirty);
   if (!targets.length) { toast('저장할 항목이 없습니다.', 'success'); return; }
   var btn = document.getElementById('btnSaveAll');
-  if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
   var ok = 0, fail = 0;
   showSaving('저장 중... 0/' + targets.length);
   for (var idx = 0; idx < targets.length; idx++) {
@@ -768,10 +770,10 @@ async function saveAllAiDraft() {
     var success = await saveRow(i, { keepAiDraft: true, silent: true });
     if (success) ok++; else fail++;
     showSaving('저장 중... ' + (idx+1) + '/' + targets.length);
-    if (btn) btn.textContent = '저장 중... ' + (idx+1) + '/' + targets.length;
+    if (btn) btn.textContent = 'Saving... ' + (idx+1) + '/' + targets.length;
   }
   hideSaving();
-  if (btn) { btn.disabled = false; btn.textContent = '💾 일괄 저장'; }
+  if (btn) { btn.disabled = false; btn.textContent = '💾 Save All'; }
   toast('저장 완료: ' + ok + '건' + (fail ? ', ' + fail + '건 실패' : '') + ' ✓', fail ? 'error' : 'success');
   renderTable();
 }
@@ -1356,7 +1358,7 @@ async function saveAll() {
   }
 
   var btn = document.getElementById('btnSaveAll');
-  if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
   var ok = 0, fail = 0;
   showSaving('저장 중... 0/' + targets.length);
@@ -1365,11 +1367,11 @@ async function saveAll() {
     var success = await saveRow(i, { silent: true });
     if (success) ok++; else fail++;
     showSaving('저장 중... ' + (idx+1) + '/' + targets.length);
-    if (btn) btn.textContent = '저장 중... ' + (idx+1) + '/' + targets.length;
+    if (btn) btn.textContent = 'Saving... ' + (idx+1) + '/' + targets.length;
   }
   hideSaving();
 
-  if (btn) { btn.disabled = false; btn.textContent = '💾 일괄 저장'; }
+  if (btn) { btn.disabled = false; btn.textContent = '💾 Save All'; }
   toast('일괄 저장 완료: ' + ok + '건 성공' + (fail ? ', ' + fail + '건 실패' : '') + ' ✓', fail ? 'error' : 'success');
   renderTable(); // 상태 아이콘 갱신
 }
