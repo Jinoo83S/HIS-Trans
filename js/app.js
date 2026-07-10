@@ -63,6 +63,92 @@ function getNeisWarnBytes() {
   return Math.floor(getNeisMaxBytes() * 0.9);
 }
 
+
+// 현재 엔진/모델/프롬프트 조합을 짧은 서명으로 만든다.
+// 이 값은 Raw_Trans의 Prompt 컬럼에 저장되어, 설정 변경 후 재번역 대상 판정에 사용된다.
+function hashString_(str) {
+  str = String(str || '');
+  var h = 2166136261;
+  for (var i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+  }
+  return (h >>> 0).toString(36);
+}
+
+function getCurrentEngineValue() {
+  var el = document.getElementById('selEngine');
+  return (APP.settings && APP.settings.engine) || (el && el.value) || 'claude';
+}
+function getCurrentStep1ModelValue() {
+  var el = document.getElementById('selModel');
+  var s = APP.settings || {};
+  return s.step1Model || s.model || (el && el.value) || '';
+}
+function getCurrentStep2ModelValue() {
+  var el2 = document.getElementById('selModel2');
+  var s = APP.settings || {};
+  return s.step2Model || s.model || (el2 && el2.value) || getCurrentStep1ModelValue();
+}
+function getCurrentModelLabel() {
+  return getCurrentEngineValue() + ' | step1:' + getCurrentStep1ModelValue() + ' | step2:' + getCurrentStep2ModelValue();
+}
+function getCurrentSettingsSignature() {
+  var s = APP.settings || {};
+  var payload = {
+    engine: getCurrentEngineValue(),
+    step1Model: getCurrentStep1ModelValue(),
+    step2Model: getCurrentStep2ModelValue(),
+    step1Prompt: s.step1_prompt || '',
+    step2Prompt: s.step2_prompt || '',
+    // 용어·예시도 실제 결과에 영향을 주므로 함께 반영한다.
+    terms: s.terms || '',
+    exampleLimit: s.exampleLimit || 0
+  };
+  return 'settings-v2:' + hashString_(JSON.stringify(payload));
+}
+function rowHasGeneratedText(row) {
+  if (!row) return false;
+  return !!((row.translatedDraft && String(row.translatedDraft).trim()) ||
+            (row.finalText && String(row.finalText).trim()) ||
+            (row.aiFinal && String(row.aiFinal).trim()));
+}
+function isRowSettingsOutdated(row) {
+  if (!row || !row.sourceText || !String(row.sourceText).trim()) return false;
+  if (!rowHasGeneratedText(row)) return false;
+  var savedSig = String(row.settingsSignature || row.prompt || '').trim();
+  return savedSig !== getCurrentSettingsSignature();
+}
+function getOutdatedRows() {
+  return (APP.rows || []).filter(isRowSettingsOutdated);
+}
+function updateSettingsNotice(forceMessage) {
+  var el = document.getElementById('settingsNotice');
+  if (!el) return;
+
+  if (APP.currentView === 'admin' && !forceMessage) {
+    el.style.display = 'none';
+    setTimeout(relayout, 0);
+    return;
+  }
+
+  var outdated = getOutdatedRows();
+  if (outdated.length) {
+    el.innerHTML = '<b>Translation settings updated.</b> ' +
+      outdated.length + ' item(s) were not generated with the current engine/prompt. ' +
+      '<b>Translate All</b> will retranslate those items.';
+    el.style.display = 'block';
+  } else if (forceMessage) {
+    el.innerHTML = '<b>Translation engine/prompt settings were updated.</b> ' +
+      'Select a course, then click <b>Translate All</b> to retranslate items that are not using the current settings.';
+    el.style.display = 'block';
+    setTimeout(function(){ updateSettingsNotice(false); }, 12000);
+  } else {
+    el.style.display = 'none';
+  }
+  setTimeout(relayout, 0);
+}
+
 // ── 초기화 ──────────────────────────────────────────────────
 window.onload = async function() {
   if (!Config.isSet()) { window.location.href = 'index.html'; return; }
@@ -218,6 +304,7 @@ function toggleToolbarMode(isAdminView) {
     var el = document.getElementById(id);
     if (el) el.disabled = readOnlyTrans;
   });
+  updateSettingsNotice(false);
 }
 
 
@@ -255,6 +342,7 @@ function loadSettings(cb) {
       // 엔진 설정: 관리자 외 비활성화 (읽기전용 표시)
       var isAdmin = APP.teacher.role === '관리자';
       [eng, mdl, mdl2].forEach(function(el) { if (el) el.disabled = !isAdmin; });
+      updateSettingsNotice(false);
     }
     if (cb) cb();
   }).catch(function() { if (cb) cb(); });
@@ -290,6 +378,7 @@ async function loadInitialData(force) {
 
     renderSubjectSelect();
     updateTransBadge();
+    updateSettingsNotice(false);
     toast('데이터 로드 완료 ✓', 'success');
   } catch(e) { hideLoading(); toast('오류: ' + e.message, 'error'); }
 }
@@ -478,9 +567,9 @@ async function onSubjectChange() {
           translatedDraft: saved.translatedDraft||'',
           finalText: saved.finalText||saved.reviewedText||'',
           comment: saved.reviewerComment||'', status: saved.status||'draft',
-          rowIndex: saved.rowIndex||null, translating: false, _dirty: false };
+          rowIndex: saved.rowIndex||null, model: saved.model||'', prompt: saved.prompt||'', settingsSignature: saved.prompt||'', translating: false, _dirty: false, _sourceDirty: false };
       });
-      renderCurrentView(); return;
+      renderCurrentView(); updateSettingsNotice(false); return;
     } catch(err) { hideLoading(); toast(err.message, 'error'); return; }
   }
 
@@ -498,11 +587,16 @@ async function onSubjectChange() {
       aiFinal:         saved.reviewedText    || '',  // U열 = AI 세특 원본(비교 기준)
       status:          saved.status          || 'draft',
       rowIndex:        saved.rowIndex        || null,
+      model:           saved.model           || '',
+      prompt:          saved.prompt          || '',
+      settingsSignature: saved.prompt        || '',
       translating:     false,
-      _dirty:          false
+      _dirty:          false,
+      _sourceDirty:    false
     };
   });
   renderCurrentView();
+  updateSettingsNotice(false);
 }
 
 function onFilterChange() {
@@ -609,6 +703,7 @@ function onInputSourceChange(i, val) {
   APP.rows[i].sourceText = val;
   clearTranslatedDataIfSourceEmpty(APP.rows[i]);
   APP.rows[i]._dirty = true;
+  APP.rows[i]._sourceDirty = true;
   var cell = document.querySelector('#irow_' + i + ' td:last-child');
   if (cell) cell.innerHTML =
     '<button class="btn-tr" onclick="saveRow(' + i + ')" ' +
@@ -656,7 +751,11 @@ async function pipelineRow(i) {
     if (res.finalText) { row.finalText = res.finalText; row.aiFinal = res.finalText; }
     if (res.memo) row.aiMemo = res.memo;
     row.status = 'ai_draft';  // AI 생성 → 검수 전 상태
+    row.settingsSignature = getCurrentSettingsSignature();
+    row.prompt = row.settingsSignature;
+    row.model = getCurrentModelLabel();
     row._dirty = true;
+    row._sourceDirty = false;
     if (APP.currentView === 'input') renderInputTable();
     else refreshRow(i);
     setTimeout(hideProgress, 400);
@@ -668,32 +767,89 @@ async function pipelineRow(i) {
 }
 
 // ── 2단계 파이프라인 (전체) ───────────────────────────────────
+async function saveDirtyRowsBeforeTranslateAll() {
+  var dirtyRows = (APP.rows || []).filter(function(r){ return r && r._dirty; });
+  if (!dirtyRows.length) return { success: true, sourceDirtyRows: [] };
+
+  if (!confirm('You have ' + dirtyRows.length + ' unsaved modified item(s).\n\n' +
+      'Translate All will save all modified rows first before starting translation.\n' +
+      'Continue?')) {
+    return { success: false, cancelled: true };
+  }
+
+  var sourceDirtyRows = dirtyRows.filter(function(r){ return r._sourceDirty; });
+  var ok = 0, fail = 0;
+  showSaving('Saving changes... 0/' + dirtyRows.length);
+  for (var idx = 0; idx < dirtyRows.length; idx++) {
+    var i = APP.rows.indexOf(dirtyRows[idx]);
+    var success = await saveRow(i, { silent: true, keepAiDraft: dirtyRows[idx].status === 'ai_draft' });
+    if (success) ok++; else fail++;
+    showSaving('Saving changes... ' + (idx + 1) + '/' + dirtyRows.length);
+  }
+  hideSaving();
+
+  if (fail) {
+    toast('Save failed: ' + fail + ' item(s). Translation was stopped.', 'error');
+    return { success: false, failed: true };
+  }
+  toast('Saved modified rows: ' + ok + ' item(s) ✓', 'success');
+  return { success: true, sourceDirtyRows: sourceDirtyRows };
+}
+
+function getTranslateAllTargets(sourceDirtyRows) {
+  sourceDirtyRows = sourceDirtyRows || [];
+  return APP.rows.filter(function(r) {
+    if (!r.sourceText || !String(r.sourceText).trim()) return false;
+    // 새 원문 입력/수정분, 미번역분, 또는 현재 엔진/프롬프트로 생성되지 않은 기존 결과를 재번역한다.
+    return sourceDirtyRows.indexOf(r) !== -1 || !r.finalText || isRowSettingsOutdated(r);
+  });
+}
+
 async function pipelineAll() {
   if (isTranslateReadOnlyView()) { toast('Translate 탭은 조회 전용입니다.', 'error'); return; }
-  var targets = APP.rows.filter(function(r) { return r.sourceText && r.sourceText.trim() && !r.finalText; });
-  if (!targets.length) { toast('번역할 항목이 없습니다.', 'error'); return; }
+
+  var preSave = await saveDirtyRowsBeforeTranslateAll();
+  if (!preSave.success) return;
+
+  var outdatedBefore = getOutdatedRows();
+  var targets = getTranslateAllTargets(preSave.sourceDirtyRows);
+  if (!targets.length) {
+    toast('There are no items to translate. All modified rows have been saved.', 'success');
+    updateSettingsNotice(false);
+    return;
+  }
+
+  var outdatedTargets = targets.filter(isRowSettingsOutdated);
+  if (outdatedTargets.length) {
+    if (!confirm('Translation settings have changed.\n\n' +
+        outdatedTargets.length + ' existing item(s) were not generated with the current engine/prompt.\n' +
+        'Translate All will retranslate them and may replace existing AI draft/final text.\n\n' +
+        'Continue?')) {
+      return;
+    }
+  }
 
   // 비정상적으로 긴 원문 경고
   var longOnes = targets.filter(function(r) { return r.sourceText.trim().length > SOURCE_WARN_LEN; });
   if (longOnes.length) {
     var names = longOnes.slice(0, 5).map(function(r){ return r.student.name; }).join(', ');
-    if (!confirm('⚠️ 원문이 매우 긴 학생이 ' + longOnes.length + '명 있습니다.\n(' + names +
-      (longOnes.length > 5 ? ' 외' : '') + ')\n\n' +
-      '일반 세특은 2,000자 이내입니다. 코드나 불필요한 내용이 섞이지 않았는지 확인하세요.\n' +
-      '이대로 진행하면 토큰(비용)이 많이 사용됩니다.\n\n계속하시겠습니까?')) return;
+    if (!confirm('⚠️ ' + longOnes.length + ' source text item(s) are very long.\n(' + names +
+      (longOnes.length > 5 ? ' and more' : '') + ')\n\n' +
+      'Please check whether unnecessary content is included.\n' +
+      'Continuing may use more tokens/cost.\n\nContinue?')) return;
   }
 
   // 건수 많으면 경고 (GAS quota 대비)
   if (targets.length > 30) {
-    if (!confirm(targets.length + '명을 한 번에 번역합니다.\n\n' +
-        '대량 번역은 AI 응답 한도(quota)에 걸리거나 시간이 오래 걸릴 수 있습니다.\n' +
-        '30명 이하로 나눠 진행하는 것을 권장합니다.\n\n계속하시겠습니까?')) {
+    if (!confirm('Translate ' + targets.length + ' item(s) at once?\n\n' +
+        'Large batches may take a long time or hit AI/API quota limits.\n' +
+        'Splitting into batches of 30 or fewer is recommended.\n\nContinue?')) {
       return;
     }
   }
 
   APP.progressCancelled = false;
-  showProgress('전체 번역 진행 중', 1, targets.length);
+  showProgress('Translate All in progress', 1, targets.length);
 
   var okCount = 0, failCount = 0, quotaHit = false;
 
@@ -702,7 +858,7 @@ async function pipelineAll() {
     var row = targets[idx];
     var i = APP.rows.indexOf(row);
     var pct = Math.round((idx / targets.length) * 100);
-    setProgress(pct, (idx+1) + '/' + targets.length + ' 번역 중...', row.student.name);
+    setProgress(pct, (idx+1) + '/' + targets.length + ' translating...', row.student.name);
 
     try {
       var res = await API.runPipeline({
@@ -712,15 +868,19 @@ async function pipelineAll() {
         text: row.sourceText,
         studentName: row.student.name,
         subjectName: APP.selectedSubject ? APP.selectedSubject.nameKR : '',
-      subjectCode: APP.selectedSubject ? APP.selectedSubject.subjectCode : '',
-      semester: document.getElementById('selSem').value
+        subjectCode: APP.selectedSubject ? APP.selectedSubject.subjectCode : '',
+        semester: document.getElementById('selSem').value
       });
       if (res.success) {
         if (res.translatedDraft) row.translatedDraft = res.translatedDraft;
         if (res.finalText) { row.finalText = res.finalText; row.aiFinal = res.finalText; }
         if (res.memo) row.aiMemo = res.memo;
         row.status = 'ai_draft';
+        row.settingsSignature = getCurrentSettingsSignature();
+        row.prompt = row.settingsSignature;
+        row.model = getCurrentModelLabel();
         row._dirty = true;
+        row._sourceDirty = false;
         refreshRow(i);
         okCount++;
       } else {
@@ -739,18 +899,21 @@ async function pipelineAll() {
     if (idx < targets.length - 1) await new Promise(function(r){ setTimeout(r, 300); });
   }
 
-  setProgress(100, '완료', '');
+  setProgress(100, 'Done', '');
   setTimeout(hideProgress, 500);
 
-  var msg = '번역 완료: ' + okCount + '명 성공';
-  if (failCount) msg += ', ' + failCount + '명 실패';
-  if (quotaHit) msg += ' (한도 도달 — 잠시 후 나머지를 다시 시도하세요)';
+  var msg = 'Translate All complete: ' + okCount + ' succeeded';
+  if (failCount) msg += ', ' + failCount + ' failed';
+  if (quotaHit) msg += ' (quota/limit reached — try the remaining items later)';
   toast(msg + ' ✓', quotaHit || failCount ? 'error' : 'success');
+  updateSettingsNotice(false);
 
   // 결과를 잃지 않도록 일괄 저장 안내 (AI초안 상태 유지)
   if (okCount > 0) {
     setTimeout(function() {
-      if (confirm('번역된 ' + okCount + '명의 결과를 저장하시겠습니까?\n(저장하지 않으면 새로고침 시 사라집니다)\n\n※ 저장 후에도 검수 교사가 확인·저장해야 검수완료됩니다.')) {
+      if (confirm('Save the translated results for ' + okCount + ' item(s)?\n' +
+          'If you do not save, the results may disappear after refresh.\n\n' +
+          'Even after saving, a reviewer must confirm/save them as reviewed.')) {
         saveAllAiDraft();
       }
     }, 700);
@@ -1153,7 +1316,8 @@ async function saveEngineSettingFromToolbar() {
         APP.settings.step1Model = step1;
         APP.settings.step2Model = step2;
       }
-      toast('엔진 설정 저장됨 ✓', 'success');
+      updateSettingsNotice(true);
+      toast('Engine settings saved ✓', 'success');
     }
   } catch(e) {}
 }
@@ -1294,8 +1458,8 @@ async function saveRow(i, opts) {
       neisClass:    row.student.neisClass, neisNo: row.student.neisNo,
       sourceLang:   document.getElementById('selSrc').value,
       targetLang:   document.getElementById('selTgt').value,
-      model:        document.getElementById('selModel').value,
-      prompt:       APP.prompt,
+      model:        getCurrentModelLabel(),
+      prompt:       getCurrentSettingsSignature(),
       sourceText:      row.sourceText,
       translatedDraft: row.translatedDraft,
       finalText:       row.finalText,
@@ -1308,7 +1472,11 @@ async function saveRow(i, opts) {
     if (res && res.success) row.rowIndex = res.rowIndex;
     if (res && res.success) {
       row.status = saveStatus;
+      row.settingsSignature = getCurrentSettingsSignature();
+      row.prompt = row.settingsSignature;
+      row.model = getCurrentModelLabel();
       row._dirty = false;
+      row._sourceDirty = false;
       // 캐시 갱신
       if (APP.selectedSubject) {
         var cacheKey = APP.selectedSubject.subjectCode + '|' + row.student.name;
@@ -1320,11 +1488,14 @@ async function saveRow(i, opts) {
           reviewedText:    row.aiFinal,
           aiMemo:          row.aiMemo,
           reviewerComment: row.comment,
-          status:          row.status
+          status:          row.status,
+          model:           row.model || getCurrentModelLabel(),
+          prompt:          row.settingsSignature || row.prompt || getCurrentSettingsSignature()
         };
       }
       updateTransBadge();
       refreshSubjectDropdownCounts();
+      updateSettingsNotice(false);
       // 현재 뷰에 맞는 행 갱신
       if (APP.currentView === 'input') {
         renderInputTable();
@@ -2245,6 +2416,7 @@ async function saveSettingsModal() {
       toast('설정 저장 완료 ✓', 'success');
       closeModal('settingsOverlay');
       await new Promise(function(resolve){ loadSettings(resolve); }); // 상단바 갱신 완료까지 대기
+      updateSettingsNotice(true);
     } else toast('저장 실패: ' + res.error, 'error');
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -2274,6 +2446,7 @@ async function saveRefModal() {
     if (res.success) {
       toast('용어·예시 저장 완료 ✓', 'success');
       if (APP.settings) { APP.settings.examples = examples; APP.settings.exampleLimit = exampleLimit; }
+      updateSettingsNotice(true);
       closeModal('refOverlay');
       loadSettings();
     } else toast('저장 실패: ' + res.error, 'error');
