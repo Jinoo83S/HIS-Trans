@@ -1136,9 +1136,13 @@ function renderTable() {
   empty.style.display = 'none';
 
   // 저장된 열 너비 적용 (없으면 기본값) — 12열 (번역 ▶ 열 제거됨)
-  var defaultWidths = ['6%','4%','2.5%','2.5%','4%','22%','22%','22%','3%','7%','3%','5%'];
+  // Byte/Status 열이 좁아지면 1500byte 표시와 Retranslate 버튼이 겹치므로 기본 폭 재조정
+  var defaultWidths = ['5.5%','3.8%','2.4%','2.4%','3.8%','21.2%','21.2%','21.2%','3%','6.7%','4%','4.8%'];
   var savedWidths = loadColWidths();
   var widths = (savedWidths && savedWidths.length === 12) ? savedWidths : defaultWidths;
+  // 기존 사용자 localStorage에 Byte/Status 폭이 너무 좁게 저장된 경우도 보정
+  if (parseFloat(widths[10]) < 4) widths[10] = '4%';
+  if (parseFloat(widths[11]) < 4.8) widths[11] = '4.8%';
   var colsInfo = '<colgroup>' +
     widths.map(function(w){ return '<col style="width:' + w + '">'; }).join('') +
     '</colgroup>';
@@ -1177,7 +1181,10 @@ function loadColWidths() {
     var s = localStorage.getItem(COLW_KEY);
     if (!s) return null;
     var arr = JSON.parse(s);
-    return Array.isArray(arr) && arr.length === 13 ? arr : null;
+    if (!Array.isArray(arr)) return null;
+    if (arr.length === 12) return arr;
+    if (arr.length === 13) return arr.slice(0, 12);
+    return null;
   } catch(e) { return null; }
 }
 
@@ -1277,6 +1284,16 @@ function autoResize(ta) {
   ta.style.height = Math.max(76, ta.scrollHeight) + 'px';
 }
 
+
+function formatByteCellHtml(cc, maxBytes, semLabel) {
+  if (!cc || cc <= 0) return '-';
+  return '<span style="font-size:9px;color:var(--gray);display:block;line-height:1.05">' +
+    e(semLabel || '') +
+    '</span><span style="display:block;font-size:11px;line-height:1.12;white-space:nowrap">' +
+    cc + '/' + maxBytes +
+    '</span><span style="display:block;font-size:9px;line-height:1.05;color:var(--gray)">byte</span>';
+}
+
 function rowHtml(r, i, role) {
   var s = r.student;
   var txt = r.finalText || r.translatedDraft || '';
@@ -1331,10 +1348,8 @@ function rowHtml(r, i, role) {
     <td class="col-cmt"><div class="cta cmt" id="neis_cmt_${i}"
       style="min-height:76px;padding:7px 9px;font-size:11px;
       color:var(--text2);white-space:pre-wrap">${e(r.comment)}</div></td>
-    <td><div class="cc ${ccCls}">
-      ${cc>0 ? '<span style="font-size:9px;color:var(--gray);display:block">' +
-        (document.getElementById('selSem')?.value==='1'?'1학기':'2학기') +
-        '</span>' + cc + '/' + maxBytes + 'byte' : '-'}
+    <td><div class="cc ${ccCls}" style="white-space:normal;line-height:1.15;text-align:center;overflow:hidden;min-width:0">
+      ${formatByteCellHtml(cc, maxBytes, (document.getElementById('selSem')?.value==='1'?'1학기':'2학기'))}
     </div></td>
     <td class="col-status"><div class="ci" style="padding:4px 2px">
       ${statusHtml}
@@ -1399,9 +1414,7 @@ function updateCC(i) {
   var cls = cc === 0 ? '' : cc > maxBytes ? 'cc-over' : cc > warnBytes ? 'cc-warn' : 'cc-ok';
   var sem = document.getElementById('selSem').value;
   var semLabel = sem === '1' ? '1학기' : '2학기';
-  el.innerHTML = cc > 0
-    ? '<span style="font-size:9px;color:var(--gray);display:block">' + semLabel + '</span>' + cc + '/' + maxBytes + 'byte'
-    : '-';
+  el.innerHTML = formatByteCellHtml(cc, maxBytes, semLabel);
   el.className = 'cc ' + cls;
 }
 
