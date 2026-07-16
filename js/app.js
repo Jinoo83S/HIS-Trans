@@ -805,6 +805,132 @@ function getTranslateAllTargets(sourceDirtyRows) {
   });
 }
 
+function getRetranslateAllTargets() {
+  return (APP.rows || []).filter(function(r) {
+    return r && r.sourceText && String(r.sourceText).trim();
+  });
+}
+
+async function runBatchTranslateTargets(targets, modeLabel) {
+  modeLabel = modeLabel || 'Translate All';
+
+  // 비정상적으로 긴 원문 경고
+  var longOnes = targets.filter(function(r) { return r.sourceText.trim().length > SOURCE_WARN_LEN; });
+  if (longOnes.length) {
+    var names = longOnes.slice(0, 5).map(function(r){ return r.student.name; }).join(', ');
+    if (!confirm('⚠️ ' + longOnes.length + ' source text item(s) are very long.\n(' + names +
+      (longOnes.length > 5 ? ' and more' : '') + ')\n\n' +
+      'Please check whether unnecessary content is included.\n' +
+      'Continuing may use more tokens/cost.\n\nContinue?')) return null;
+  }
+
+  // 건수 많으면 경고 (GAS quota 대비)
+  if (targets.length > 30) {
+    if (!confirm(modeLabel + ' ' + targets.length + ' item(s) at once?\n\n' +
+        'Large batches may take a long time or hit AI/API quota limits.\n' +
+        'Splitting into batches of 30 or fewer is recommended.\n\nContinue?')) {
+      return null;
+    }
+  }
+
+  APP.progressCancelled = false;
+  showProgress(modeLabel + ' in progress', 1, targets.length);
+
+  var okCount = 0, failCount = 0, quotaHit = false;
+
+  for (var idx = 0; idx < targets.length; idx++) {
+    if (APP.progressCancelled) { break; }
+    var row = targets[idx];
+    var i = APP.rows.indexOf(row);
+    var pct = Math.round((idx / targets.length) * 100);
+    setProgress(pct, (idx+1) + '/' + targets.length + ' translating...', row.student.name);
+
+    try {
+      var res = await API.runPipeline({
+        step: 'both',
+        sourceLang: document.getElementById('selSrc').value,
+        targetLang: document.getElementById('selTgt').value,
+        text: row.sourceText,
+        studentName: row.student.name,
+        subjectName: APP.selectedSubject ? APP.selectedSubject.nameKR : '',
+        subjectCode: APP.selectedSubject ? APP.selectedSubject.subjectCode : '',
+        semester: document.getElementById('selSem').value
+      });
+      if (res.success) {
+        row.translatedDraft = res.translatedDraft || '';
+        row.finalText = res.finalText || '';
+        row.aiFinal = res.finalText || '';
+        row.aiMemo = res.memo || '';
+        row.status = 'ai_draft';
+        row.settingsSignature = getCurrentSettingsSignature();
+        row.prompt = row.settingsSignature;
+        row.model = getCurrentModelLabel();
+        row._dirty = true;
+        row._sourceDirty = false;
+        refreshRow(i);
+        okCount++;
+      } else {
+        failCount++;
+        // quota/한도 관련 오류 감지 시 중단
+        if (res.error && (res.error.indexOf('quota') !== -1 ||
+            res.error.indexOf('한도') !== -1 || res.error.indexOf('limit') !== -1 ||
+            res.error.indexOf('혼잡') !== -1)) {
+          quotaHit = true;
+          break;
+        }
+      }
+    } catch(e) { failCount++; }
+
+    // rate limit 완화: 호출 간 짧은 지연
+    if (idx < targets.length - 1) await new Promise(function(r){ setTimeout(r, 300); });
+  }
+
+  setProgress(100, 'Done', '');
+  setTimeout(hideProgress, 500);
+
+  var msg = modeLabel + ' complete: ' + okCount + ' succeeded';
+  if (failCount) msg += ', ' + failCount + ' failed';
+  if (quotaHit) msg += ' (quota/limit reached — try the remaining items later)';
+  toast(msg + ' ✓', quotaHit || failCount ? 'error' : 'success');
+  updateSettingsNotice(false);
+
+  return { okCount: okCount, failCount: failCount, quotaHit: quotaHit };
+}
+
+async function promptSaveAiDraftResults(okCount) {
+  if (okCount > 0) {
+    setTimeout(function() {
+      if (confirm('Save the translated results for ' + okCount + ' item(s)?\n' +
+          'If you do not save, the results may disappear after refresh.\n\n' +
+          'Even after saving, a reviewer must confirm/save them as reviewed.')) {
+        saveAllAiDraft();
+      }
+    }, 700);
+  }
+}
+
+async function retranslateAll() {
+  if (isTranslateReadOnlyView()) { toast('Translate 탭은 조회 전용입니다.', 'error'); return; }
+
+  var preSave = await saveDirtyRowsBeforeTranslateAll();
+  if (!preSave.success) return;
+
+  var targets = getRetranslateAllTargets();
+  if (!targets.length) {
+    toast('There are no source text items to retranslate.', 'success');
+    return;
+  }
+
+  if (!confirm('Retranslate ' + targets.length + ' item(s)?\n\n' +
+      'This will overwrite existing translation drafts and final text with new AI results.\n' +
+      'Continue?')) {
+    return;
+  }
+
+  var result = await runBatchTranslateTargets(targets, 'Retranslate');
+  if (result) await promptSaveAiDraftResults(result.okCount);
+}
+
 async function pipelineAll() {
   if (isTranslateReadOnlyView()) { toast('Translate 탭은 조회 전용입니다.', 'error'); return; }
 
