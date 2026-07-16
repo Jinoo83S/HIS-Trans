@@ -1548,11 +1548,57 @@ async function saveAll() {
 }
 
 // ── NEIS 엑셀 다운로드 ──────────────────────────────────────────
-function downloadExcel() {
+var __hisXlsxLoadPromise = null;
+
+function ensureExcelLibraryLoaded() {
+  if (typeof XLSX !== 'undefined') return Promise.resolve(true);
+  if (__hisXlsxLoadPromise) return __hisXlsxLoadPromise;
+
+  var urls = (window.__HIS_XLSX_CDN_URLS && window.__HIS_XLSX_CDN_URLS.length)
+    ? window.__HIS_XLSX_CDN_URLS.slice()
+    : [
+        'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js',
+        'https://unpkg.com/xlsx-js-style@1.2.0/dist/xlsx.bundle.js'
+      ];
+
+  __hisXlsxLoadPromise = new Promise(function(resolve, reject) {
+    var idx = 0;
+    function loadNext() {
+      if (typeof XLSX !== 'undefined') { resolve(true); return; }
+      if (idx >= urls.length) {
+        reject(new Error('Excel library load failed'));
+        return;
+      }
+      var src = urls[idx++];
+      var script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.onload = function() {
+        if (typeof XLSX !== 'undefined') resolve(true);
+        else loadNext();
+      };
+      script.onerror = loadNext;
+      document.head.appendChild(script);
+    }
+    loadNext();
+  });
+
+  return __hisXlsxLoadPromise;
+}
+
+async function downloadExcel() {
   if (isTranslateReadOnlyView()) { toast('Translate 탭은 조회 전용입니다.', 'error'); return; }
   if (!APP.rows || !APP.rows.length) { toast('다운로드할 데이터가 없습니다.', 'error'); return; }
   if (!APP.selectedSubject) { toast('과목을 선택하세요.', 'error'); return; }
-  if (typeof XLSX === 'undefined') { toast('엑셀 라이브러리 로드 실패. 새로고침 후 다시 시도하세요.', 'error'); return; }
+  if (typeof XLSX === 'undefined') {
+    toast('Loading Excel library...', '');
+    try {
+      await ensureExcelLibraryLoaded();
+    } catch (err) {
+      toast('Excel library load failed. Please refresh or check CDN access.', 'error');
+      return;
+    }
+  }
 
   var year = document.getElementById('selYear').value;
   var sem  = document.getElementById('selSem').value;
