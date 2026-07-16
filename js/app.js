@@ -931,6 +931,27 @@ async function retranslateAll() {
   if (result) await promptSaveAiDraftResults(result.okCount);
 }
 
+async function retranslateRow(i) {
+  if (isTranslateReadOnlyView()) { toast('Translate 탭은 조회 전용입니다.', 'error'); return; }
+
+  var row = APP.rows[i];
+  if (!row) return;
+  if (!row.sourceText || !String(row.sourceText).trim()) {
+    toast('There is no source text to retranslate.', 'error');
+    return;
+  }
+
+  var hasExisting = !!(row.translatedDraft || row.finalText);
+  var msg = 'Retranslate this item?\n\n' +
+    'Student: ' + (row.student && (row.student.engName || row.student.name) || '') + '\n' +
+    (hasExisting ? 'Existing translation draft and final text will be overwritten with new AI results.\n' : '') +
+    (row._dirty ? '\nThis row has unsaved changes. They may be replaced by the new translation.\n' : '') +
+    '\nContinue?';
+
+  if (!confirm(msg)) return;
+  await pipelineRow(i);
+}
+
 async function pipelineAll() {
   if (isTranslateReadOnlyView()) { toast('Translate 탭은 조회 전용입니다.', 'error'); return; }
 
@@ -1278,14 +1299,7 @@ function rowHtml(r, i, role) {
         color:var(--primary);padding:4px;transition:transform 0.15s"
         onmouseover="this.style.transform=\'scale(1.3)\'"
         onmouseout="this.style.transform=\'scale(1)\'">🔍</button>`;
-  var statusHtml = buildStatusBadge(r, i);
-  if (!readOnly) {
-    statusHtml += `<button class="btn-cp" onclick="saveRow(${i})"
-        style="margin-top:5px;width:100%;
-        ${r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : ''}">
-        저장
-      </button>`;
-  }
+  var statusHtml = buildStatusCellHtml(i);
 
   return `<tr id="row_${i}">
     <td class="col-info"><div class="ci" style="font-size:11px">${e(s.engName||'-')}</div></td>
@@ -1351,10 +1365,7 @@ function showEmptyTrans() {
 function markDirty(i) {
   if (APP.rows[i]) { APP.rows[i]._dirty = true; }
   var td = document.querySelector('#row_' + i + ' td:last-child .ci');
-  if (td) td.innerHTML = buildStatusBadge(APP.rows[i], i) +
-    '<button class="btn-cp" onclick="saveRow(' + i + ')" ' +
-    'style="margin-top:5px;width:100%;background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700">저장</button>' +
-    '<button class="btn-cp" onclick="copyFinal(' + i + ')" style="margin-top:3px;width:100%">복사</button>';
+  if (td) td.innerHTML = buildStatusCellHtml(i);
 }
 
 function onDraftChange(i, val) {
@@ -2701,6 +2712,26 @@ function resetUrl() {
 }
 
 // ── 유틸 ────────────────────────────────────────────────────
+function buildStatusCellHtml(i) {
+  var r = APP.rows[i];
+  var html = buildStatusBadge(r, i);
+
+  if (!isTranslateReadOnlyView()) {
+    if (r && r.sourceText && String(r.sourceText).trim()) {
+      html += '<button class="btn-cp" onclick="retranslateRow(' + i + ')" ' +
+        'style="margin-top:5px;width:100%;background:#eef2ff;' +
+        'border-color:#c7d2fe;color:#3730a3;font-weight:700">↻ Retranslate</button>';
+    }
+
+    html += '<button class="btn-cp" onclick="saveRow(' + i + ')" ' +
+      'style="margin-top:5px;width:100%;' +
+      (r && r._dirty ? 'background:#fee2e2;border-color:#fca5a5;color:var(--red);font-weight:700' : '') +
+      '">저장</button>';
+  }
+
+  return html;
+}
+
 function buildStatusBadge(r, idx) {
   // 저장 안 됨
   if (!r.rowIndex) {
