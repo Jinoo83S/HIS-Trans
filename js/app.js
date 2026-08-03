@@ -313,6 +313,14 @@ function loadSettings(cb) {
   API.getSettings().then(function(res) {
     if (res && res.success) {
       APP.settings = res.data;
+
+      // 관리자가 설정한 운영 학년도·학기를 모든 사용자에게 적용한다.
+      // 비관리자는 학년도/학기 선택이 잠겨 있으므로, 여기서 받은 전역 설정값이 실제 조회 기준이 된다.
+      var yEl = document.getElementById('selYear');
+      var sEl = document.getElementById('selSem');
+      if (yEl && res.data.activeYear) yEl.value = String(res.data.activeYear);
+      if (sEl && res.data.activeSemester) sEl.value = String(res.data.activeSemester);
+
       mergeCustomModels(res.data.customModels);
       // 엔진/모델 기본값 적용
       var eng = document.getElementById('selEngine');
@@ -599,15 +607,56 @@ async function onSubjectChange() {
   updateSettingsNotice(false);
 }
 
-function onFilterChange() {
+async function saveActivePeriodFromToolbarIfNeeded() {
+  if (!APP.teacher || APP.teacher.role !== '관리자') return true;
+
+  var yEl = document.getElementById('selYear');
+  var sEl = document.getElementById('selSem');
+  if (!yEl || !sEl) return true;
+
+  var activeYear = String(yEl.value || '').trim();
+  var activeSemester = String(sEl.value || '').trim();
+  var cur = APP.settings || {};
+
+  // 학년 필터 변경처럼 운영 학년도/학기가 바뀌지 않은 경우에는 저장하지 않는다.
+  if (String(cur.activeYear || '') === activeYear && String(cur.activeSemester || '') === activeSemester) {
+    return true;
+  }
+
+  try {
+    var res = await API.saveSettings({
+      activeYear: activeYear,
+      activeSemester: activeSemester
+    });
+    if (res && res.success) {
+      APP.settings = APP.settings || {};
+      APP.settings.activeYear = activeYear;
+      APP.settings.activeSemester = activeSemester;
+      toast('Active year/semester saved for all users ✓', 'success');
+      return true;
+    }
+    toast('운영 학년도·학기 저장 실패: ' + ((res && res.error) || ''), 'error');
+    return false;
+  } catch(e) {
+    toast('운영 학년도·학기 저장 오류: ' + e.message, 'error');
+    return false;
+  }
+}
+
+async function onFilterChange() {
   // 학년도 유효성 검사
   var yEl = document.getElementById('selYear');
-  var y = parseInt(yEl.value);
+  var y = parseInt(yEl.value, 10);
   if (!y || y < 2020 || y > 2099) {
     yEl.value = new Date().getFullYear();
     toast('학년도는 2020~2099 범위로 입력하세요.', 'error');
     return;
   }
+
+  // 관리자가 학년도·학기를 바꾸면 Raw_Prompt 설정에 저장하여 다른 사용자에게도 적용한다.
+  var saved = await saveActivePeriodFromToolbarIfNeeded();
+  if (!saved) return;
+
   APP.cache.loaded = false;
   _historyAll = null; // 연도/학기 변경 시 이력 전체 캐시 무효화
   loadSubjects();
