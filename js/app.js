@@ -41,6 +41,21 @@ function isTranslateReadOnlyView() {
 
 var DEFAULT_NEIS_MAX_BYTES = 1500;
 
+// 학년도·학기는 날짜로 자동 계산하지 않는다.
+// 최초 기본값만 두고, 실제 운영값은 관리자가 상단 Year / Sem.에서 수동 저장한다.
+var MANUAL_DEFAULT_ACTIVE_YEAR = '2026';
+var MANUAL_DEFAULT_ACTIVE_SEMESTER = '1';
+
+function normalizeActiveYearValue(v) {
+  v = String(v || '').trim();
+  return /^\d{4}$/.test(v) ? v : MANUAL_DEFAULT_ACTIVE_YEAR;
+}
+
+function normalizeActiveSemesterValue(v) {
+  v = String(v || '').trim();
+  return (v === '1' || v === '2') ? v : MANUAL_DEFAULT_ACTIVE_SEMESTER;
+}
+
 // NEIS byte 계산: 한글/비ASCII=3byte, 영문·숫자·공백·줄바꿈=1byte
 // Excel(한국어 DBCS 환경) 기준: =(LENB(A1)-LEN(A1))*2+LEN(A1) 와 동일한 계산 방향
 function neisByteLength(str) {
@@ -225,10 +240,11 @@ function initUI() {
   if (canTranslate) document.getElementById('navTranslate').style.display = '';
   if (role === '관리자') document.getElementById('navAdmin').style.display = '';
 
-  // 학년도 기본값 (현재 연도)
-  var now = new Date(), curY = now.getFullYear();
-  document.getElementById('selYear').value = curY;
-  document.getElementById('selSem').value = (now.getMonth() + 1) <= 7 ? '1' : '2';
+  // 학년도·학기는 자동 계산하지 않는다.
+  // 실제 운영값은 loadSettings()에서 Raw_Prompt의 active_year / active_semester를 적용한다.
+  // 설정 로드 전에는 수동 기본값만 임시 표시한다.
+  document.getElementById('selYear').value = MANUAL_DEFAULT_ACTIVE_YEAR;
+  document.getElementById('selSem').value = MANUAL_DEFAULT_ACTIVE_SEMESTER;
 
   // 학년도·학기 변경은 관리자만 (비관리자는 읽기전용)
   if (t.role !== '관리자') {
@@ -314,12 +330,16 @@ function loadSettings(cb) {
     if (res && res.success) {
       APP.settings = res.data;
 
-      // 관리자가 설정한 운영 학년도·학기를 모든 사용자에게 적용한다.
-      // 비관리자는 학년도/학기 선택이 잠겨 있으므로, 여기서 받은 전역 설정값이 실제 조회 기준이 된다.
+      // 관리자가 Raw_Prompt에 저장한 운영 학년도·학기를 모든 사용자에게 적용한다.
+      // 날짜 기준 자동 계산은 사용하지 않는다.
       var yEl = document.getElementById('selYear');
       var sEl = document.getElementById('selSem');
-      if (yEl && res.data.activeYear) yEl.value = String(res.data.activeYear);
-      if (sEl && res.data.activeSemester) sEl.value = String(res.data.activeSemester);
+      var activeYear = normalizeActiveYearValue(res.data.activeYear);
+      var activeSemester = normalizeActiveSemesterValue(res.data.activeSemester);
+      res.data.activeYear = activeYear;
+      res.data.activeSemester = activeSemester;
+      if (yEl) yEl.value = activeYear;
+      if (sEl) sEl.value = activeSemester;
 
       mergeCustomModels(res.data.customModels);
       // 엔진/모델 기본값 적용
@@ -614,8 +634,10 @@ async function saveActivePeriodFromToolbarIfNeeded() {
   var sEl = document.getElementById('selSem');
   if (!yEl || !sEl) return true;
 
-  var activeYear = String(yEl.value || '').trim();
-  var activeSemester = String(sEl.value || '').trim();
+  var activeYear = normalizeActiveYearValue(yEl.value);
+  var activeSemester = normalizeActiveSemesterValue(sEl.value);
+  yEl.value = activeYear;
+  sEl.value = activeSemester;
   var cur = APP.settings || {};
 
   // 학년 필터 변경처럼 운영 학년도/학기가 바뀌지 않은 경우에는 저장하지 않는다.
@@ -644,14 +666,17 @@ async function saveActivePeriodFromToolbarIfNeeded() {
 }
 
 async function onFilterChange() {
-  // 학년도 유효성 검사
+  // 학년도 유효성 검사: 날짜로 자동 보정하지 않고 수동 기본값/저장값으로만 보정한다.
   var yEl = document.getElementById('selYear');
   var y = parseInt(yEl.value, 10);
   if (!y || y < 2020 || y > 2099) {
-    yEl.value = new Date().getFullYear();
+    yEl.value = normalizeActiveYearValue(APP.settings && APP.settings.activeYear);
     toast('학년도는 2020~2099 범위로 입력하세요.', 'error');
     return;
   }
+
+  var sEl = document.getElementById('selSem');
+  if (sEl) sEl.value = normalizeActiveSemesterValue(sEl.value);
 
   // 관리자가 학년도·학기를 바꾸면 Raw_Prompt 설정에 저장하여 다른 사용자에게도 적용한다.
   var saved = await saveActivePeriodFromToolbarIfNeeded();
