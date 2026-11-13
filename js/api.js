@@ -63,6 +63,8 @@ var API = (function() {
     saveSettings:       (data)                  => call('saveSettings', { data }),
     resetSettings:      ()                      => call('resetSettings'),
     getCurriculumAll:   ()                      => call('getCurriculumAll'),
+    getDataSourceInfo:  ()                      => call('getDataSourceInfo'),
+    refreshDataSource:  (year, semester)        => call('refreshDataSource', { year, semester }),
     updateCurriculum:   (rowIndex, fields)      => call('updateCurriculum', { rowIndex, fields }),
     addCurriculum:      (fields)                => call('addCurriculum', { fields }),
     deleteCurriculum:   (rowIndex)              => call('deleteCurriculum', { rowIndex }),
@@ -89,3 +91,4 @@ var API = (function() {
     getModels:          ()                      => call('getModels'),
   };
 })();
+
