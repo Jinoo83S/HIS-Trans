@@ -21,8 +21,10 @@ var APP = {
     loaded:    false,
     courseMap: {},
     clubMap:   {},
-    transMap:  {}
+    transMap:  {},
+    subjectStudents: {}
   },
+  periodSummary: {},
   settings: null,  // 엔진/프롬프트/용어/예시
   progressCancelled: false
 };
@@ -399,16 +401,34 @@ async function loadInitialData(force) {
 
     // 캐시 저장
     APP.subjects        = res.subjects  || [];
-    APP.cache.courseMap = res.courseMap || {};
-    APP.cache.clubMap   = res.clubMap   || {};
-    APP.cache.transMap  = res.transMap  || {};
+    // 기준정보만 먼저 표시한다. 학생·번역 데이터는 과목 선택 시 지연 로딩한다.
+    APP.cache.courseMap = {};
+    APP.cache.clubMap   = {};
+    APP.cache.transMap  = {};
+    APP.cache.subjectStudents = {};
+    APP.periodSummary   = res.periodSummary || {};
     APP.cache.loaded    = true;
+    APP.selectedSubject = null;
+    APP.rows = [];
 
     renderSubjectSelect();
     updateTransBadge();
     updateSettingsNotice(false);
     toast('데이터 로드 완료 ✓', 'success');
+    loadPeriodSummary(year);
   } catch(e) { hideLoading(); toast('오류: ' + e.message, 'error'); }
+}
+
+async function loadPeriodSummary(year) {
+  try {
+    var res = await API.getPeriodSummary(year);
+    if (!res || !res.success) return;
+    APP.periodSummary = res.data || {};
+    updateTransBadge();
+    refreshSubjectDropdownCounts();
+  } catch(e) {
+    // 요약 배지는 보조 정보이므로 실패해도 본문 사용을 막지 않는다.
+  }
 }
 
 function renderSubjectSelect() {
@@ -487,12 +507,6 @@ function renderSubjectSelect() {
 function countMissingInput(subjectCode, isClub) {
   var code = String(subjectCode);
 
-  // 전체 학생 목록 (캐시)
-  var students = isClub
-    ? (APP.cache.clubMap[code] || [])
-    : (APP.cache.courseMap[code] || []);
-  if (!students.length) return 0;
-
   // 현재 선택된 과목이면 화면 데이터로 정확히 계산
   if (APP.selectedSubject && String(APP.selectedSubject.subjectCode) === code && APP.rows.length) {
     var c = 0;
@@ -502,25 +516,10 @@ function countMissingInput(subjectCode, isClub) {
     return c;
   }
 
-  // 캐시 transMap에서 원문 입력된 학생 집합
-  var tm = APP.cache.transMap || {};
-  var entered = {};
-  Object.keys(tm).forEach(function(key) {
-    var sep = key.indexOf('|');
-    if (sep === -1) return;
-    if (key.substring(0, sep) !== code) return;
-    var rec = tm[key];
-    if (rec.sourceText && String(rec.sourceText).trim()) {
-      entered[key.substring(sep + 1)] = true; // 학생명
-    }
-  });
-
-  // 전체 학생 중 미입력 수
-  var miss = 0;
-  students.forEach(function(s) {
-    if (!entered[s.name]) miss++;
-  });
-  return miss;
+  var sem = document.getElementById('selSem').value;
+  var period = APP.periodSummary && APP.periodSummary[sem];
+  var item = period && period.bySubject && period.bySubject[code];
+  return item ? Number(item.missing || 0) : 0;
 }
 
 // 특정 과목의 번역 대기 건수 (원문 있고 최종본 없음)
@@ -536,17 +535,10 @@ function countPendingBySubject(subjectCode) {
     return c;
   }
 
-  // 그 외 과목은 캐시 transMap으로 계산
-  var tm = APP.cache.transMap || {};
-  var n = 0;
-  Object.keys(tm).forEach(function(key) {
-    var sep = key.indexOf('|');
-    if (sep === -1) return;
-    if (key.substring(0, sep) !== code) return;
-    var rec = tm[key];
-    if (rec.sourceText && String(rec.sourceText).trim() && rec.status !== 'reviewed') n++;
-  });
-  return n;
+  var sem = document.getElementById('selSem').value;
+  var period = APP.periodSummary && APP.periodSummary[sem];
+  var item = period && period.bySubject && period.bySubject[code];
+  return item ? Number(item.pending || 0) : 0;
 }
 
 // 드롭다운 대기 건수만 갱신 (현재 선택 유지)
@@ -567,37 +559,27 @@ async function onSubjectChange() {
   var isClub      = APP.currentTab === '동아리';
   var subjectCode = APP.selectedSubject.subjectCode;
 
-  // 번역 탭: 캐시에서 즉시 로드
-  var students = isClub
-    ? (APP.cache.clubMap[subjectCode]   || [])
-    : (APP.cache.courseMap[subjectCode] || []);
+  var year = document.getElementById('selYear').value;
+  var sem = document.getElementById('selSem').value;
+  var subjectCacheKey = [year, sem, isClub ? 'club' : 'course', subjectCode].join('|');
+  var hasSubjectCache = Object.prototype.hasOwnProperty.call(APP.cache.subjectStudents, subjectCacheKey);
+  var students = APP.cache.subjectStudents[subjectCacheKey] || [];
 
-  if (!students.length && !APP.cache.loaded) {
-    // 캐시 미준비 시 fallback: API 직접 호출
+  if (!hasSubjectCache) {
+    // 과목을 선택한 시점에 해당 학생과 해당 학기 번역만 한 번에 가져온다.
     showLoading('불러오는 중...');
     try {
-      var [sRes, tRes] = await Promise.all([
-        API.getStudentsByCourse(subjectCode, isClub, document.getElementById('selSem').value),
-        API.getTransList({ year: document.getElementById('selYear').value,
-                          semester: document.getElementById('selSem').value,
-                          subjectCode: subjectCode })
-      ]);
+      var dataRes = await API.getSubjectData(year, sem, subjectCode, isClub);
       hideLoading();
-      if (!sRes.success) { toast('학생 로드 실패', 'error'); return; }
-      students = sRes.data;
-      var fm = {};
-      (tRes.data || []).forEach(function(t) {
-        if (!fm[t.studentName] || t.rowIndex > fm[t.studentName].rowIndex) fm[t.studentName] = t;
+      if (!dataRes || !dataRes.success) { toast('과목 데이터 로드 실패', 'error'); return; }
+      students = dataRes.students || [];
+      APP.cache.subjectStudents[subjectCacheKey] = students;
+      (dataRes.translations || []).forEach(function(t) {
+        var key = subjectCode + '|' + t.studentName;
+        if (!APP.cache.transMap[key] || t.rowIndex > APP.cache.transMap[key].rowIndex) {
+          APP.cache.transMap[key] = t;
+        }
       });
-      APP.rows = students.map(function(s) {
-        var saved = fm[s.name] || {};
-        return { student: s, sourceText: saved.sourceText||'',
-          translatedDraft: saved.translatedDraft||'',
-          finalText: saved.finalText||saved.reviewedText||'',
-          comment: saved.reviewerComment||'', status: saved.status||'draft',
-          rowIndex: saved.rowIndex||null, model: saved.model||'', prompt: saved.prompt||'', settingsSignature: saved.prompt||'', translating: false, _dirty: false, _sourceDirty: false };
-      });
-      renderCurrentView(); updateSettingsNotice(false); return;
     } catch(err) { hideLoading(); toast(err.message, 'error'); return; }
   }
 
@@ -1315,12 +1297,8 @@ function setupColumnResize() {
 function updateTransBadge() {
   var badge = document.getElementById('transBadge');
   if (badge) {
-    var count = 0;
-    var tm = APP.cache.transMap || {};
-    Object.keys(tm).forEach(function(key) {
-      var rec = tm[key];
-      if (rec.sourceText && rec.sourceText.trim() && rec.status !== 'reviewed') count++;
-    });
+    var sem = document.getElementById('selSem').value;
+    var count = Number((APP.periodSummary[sem] && APP.periodSummary[sem].pending) || 0);
     if (count > 0) { badge.textContent = count; badge.style.display = ''; }
     else badge.style.display = 'none';
   }
@@ -1331,15 +1309,10 @@ function updateTransBadge() {
 function updateInputBadge() {
   var badge = document.getElementById('inputBadge');
   if (!badge) return;
-  if (!APP.subjects || !APP.subjects.length) { badge.style.display = 'none'; return; }
-
-  var totalMissing = 0;
-  APP.subjects.forEach(function(s) {
-    totalMissing += countMissingInput(s.subjectCode, s.type === '동아리');
-  });
-
-  if (totalMissing > 0) {
-    badge.textContent = totalMissing;
+  var sem1 = Number((APP.periodSummary['1'] && APP.periodSummary['1'].missing) || 0);
+  var sem2 = Number((APP.periodSummary['2'] && APP.periodSummary['2'].missing) || 0);
+  if (sem1 > 0 || sem2 > 0) {
+    badge.textContent = '1학기 ' + sem1 + ' · 2학기 ' + sem2;
     badge.style.display = '';
   } else {
     badge.style.display = 'none';
@@ -1718,6 +1691,7 @@ async function saveRow(i, opts) {
         };
       }
       updateTransBadge();
+      loadPeriodSummary(document.getElementById('selYear').value);
       refreshSubjectDropdownCounts();
       updateSettingsNotice(false);
       // 현재 뷰에 맞는 행 갱신
@@ -2453,12 +2427,15 @@ async function refreshDataSourceFromAdmin() {
     APP.subjects        = res.subjects  || [];
     APP.cache.courseMap = res.courseMap || {};
     APP.cache.clubMap   = res.clubMap   || {};
-    APP.cache.transMap  = res.transMap  || {};
+    APP.cache.transMap  = {};
+    APP.cache.subjectStudents = {};
+    APP.periodSummary   = res.periodSummary || {};
     APP.cache.loaded    = true;
     APP.selectedSubject = null;
     APP.rows = [];
     renderSubjectSelect();
     updateTransBadge();
+    loadPeriodSummary(year);
     toast('학생·과목 정보를 시트에서 다시 가져왔습니다 ✓', 'success');
     await openDataSourceModal();
   } catch(err) {
