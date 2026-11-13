@@ -41,6 +41,8 @@ var API = (function() {
   return {
     call,  // 직접 호출용 (토큰 불필요 액션)
     getInitialData: (year, semester) => call('getInitialData', { year, semester }),
+    getSubjectData: (year, semester, subjectCode, isClub) => call('getSubjectData', { year, semester, subjectCode, isClub }),
+    getPeriodSummary:(year)                    => call('getPeriodSummary', { year }),
     // 인증
     login:              (name, pw)              => call('login', { name, password: pw }),
 
